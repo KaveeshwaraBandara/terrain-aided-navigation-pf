@@ -1,0 +1,56 @@
+# Default experiment configuration. Override per run, e.g.
+#   python scripts/run_experiment.py --region hill_country --runs 50
+
+seed: 42
+region: synthetic            # synthetic | any key in configs/regions.yaml
+dem_dir: data/processed
+
+synthetic:                   # used only when region == synthetic (no download needed)
+  size_m: 20000.0
+  res: 30.0
+  n_hills: 60
+  relief: 600.0
+  seed: 0
+
+simulation:
+  dt: 1.0                    # s, INS + altimeter rate seen by the filters
+  duration: 300.0            # s
+  speed: 40.0                # m/s
+  clearance_m: 300.0         # flight altitude above the highest terrain in the box
+  weave_amplitude_deg: 25.0
+  weave_period_s: 120.0
+  ins:
+    bias_sigma0: 0.3         # m/s, initial velocity-bias std per axis
+    bias_rw_sigma: 0.002     # m/s/sqrt(s), bias random walk
+    noise_sigma: 0.05        # m/s, white noise on INS velocity
+  baro_sigma: 2.0            # m
+  radar_sigma: 3.0           # m
+  outlier_prob: 0.0          # probability of a radar-altimeter outlier per step
+  outlier_sigma: 100.0       # m, std of an outlier
+
+init:
+  position_sigma: 500.0      # m, std of the initial position error per axis
+
+particle_filter:
+  n_particles: 5000
+  resampling: systematic     # multinomial | systematic | stratified | residual
+  ess_threshold: 0.5         # resample when N_eff / N drops below this
+  process_sigma_pos: 2.0     # m per step
+  process_sigma_bias: 0.002  # m/s per step
+  meas_sigma: 3.6            # m, ~ sqrt(baro_sigma^2 + radar_sigma^2)
+  roughening: 0.0            # 0 disables roughening
+  snapshot_every: 30         # store the particle cloud every N steps (0 = off)
+
+ekf:
+  process_sigma_pos: 2.0
+  process_sigma_bias: 0.002
+  meas_sigma: 3.6
+
+dead_reckoning:
+  process_sigma_pos: 2.0
+
+experiment:
+  filters: [dead_reckoning, particle_filter, ekf]
+  monte_carlo_runs: 1
+  convergence_threshold_m: 50.0
+  output_dir: results

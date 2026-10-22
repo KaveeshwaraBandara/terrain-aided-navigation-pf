@@ -1,0 +1,24 @@
+# Study regions (WGS84 lat/lon bounding boxes, ~20 km x 20 km each).
+# Boxes are approximate — adjust after looking at the hillshade.
+# Every region is reprojected to UTM zone 44N (EPSG:32644), which covers all of Sri Lanka.
+
+hill_country:
+  description: Central highlands around Nuwara Eliya — high, rugged relief (informative terrain)
+  south: 6.85
+  north: 7.03
+  west: 80.68
+  east: 80.86
+
+kandy_rolling:
+  description: Hills and valleys around Kandy — moderate relief
+  south: 7.20
+  north: 7.38
+  west: 80.54
+  east: 80.72
+
+north_central_plains:
+  description: Dry-zone plains near Anuradhapura — very flat (uninformative terrain)
+  south: 8.22
+  north: 8.40
+  west: 80.30
+  east: 80.48
