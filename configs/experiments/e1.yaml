@@ -1,0 +1,13 @@
+description: >
+  E1 — filter comparison vs initial position uncertainty on the three real regions.
+  When does linearisation fail, and does the answer depend on the terrain?
+runs: 300
+regions: [hill_country, kandy_rolling, north_central_plains]
+filters:
+  dead_reckoning: {family: dead_reckoning}
+  ekf: {family: ekf}
+  pf_5000: {family: particle_filter, set: {particle_filter.n_particles: 5000}}
+  pf_20000: {family: particle_filter, set: {particle_filter.n_particles: 20000}}
+grid:
+  init.position_sigma: [100, 250, 500, 1000, 1500, 2000]
+quick: {runs: 3}

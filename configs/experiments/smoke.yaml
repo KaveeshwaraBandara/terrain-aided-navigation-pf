@@ -1,0 +1,17 @@
+description: >
+  Smoke test on synthetic terrain (no download needed), structured like E1. Used to check
+  the whole pipeline (sweep -> summary -> figures) on a fresh clone and in development.
+runs: 20
+regions: [synthetic]
+set:
+  synthetic.size_m: 40000.0
+  synthetic.n_hills: 240
+  simulation.duration: 200.0
+filters:
+  dead_reckoning: {family: dead_reckoning}
+  ekf: {family: ekf}
+  pf_5000: {family: particle_filter, set: {particle_filter.n_particles: 5000}}
+  pf_20000: {family: particle_filter, set: {particle_filter.n_particles: 20000}}
+grid:
+  init.position_sigma: [250, 1000, 2000]
+quick: {runs: 3}

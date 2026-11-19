@@ -1,0 +1,15 @@
+description: >
+  E5 — consistency and the theoretical bound. The ensemble ANEES and ensemble PCRB use the
+  E1 runs (random flights); this file adds fixed flight plans (5 per region, 100 runs each
+  with fresh noise and initial error) for the per-flight bound.
+runs: 100
+regions: [hill_country, kandy_rolling, north_central_plains]
+set:
+  init.position_sigma: 500
+filters:
+  ekf: {family: ekf}
+  pf_5000: {family: particle_filter, set: {particle_filter.n_particles: 5000}}
+  pf_20000: {family: particle_filter, set: {particle_filter.n_particles: 20000}}
+grid:
+  simulation.flight.plan: [0, 1, 2, 3, 4]
+quick: {runs: 3}

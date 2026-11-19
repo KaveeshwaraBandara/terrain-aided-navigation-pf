@@ -1,0 +1,17 @@
+description: >
+  E7 — Rao-Blackwellised (marginalised) PF vs the plain PF at equal particle count
+  (equal runtime from scripts/benchmark.py).
+runs: 100
+regions: [hill_country, kandy_rolling, north_central_plains]
+set:
+  init.position_sigma: 1000
+filters:
+  pf_500: {family: particle_filter, set: {particle_filter.n_particles: 500}}
+  pf_1000: {family: particle_filter, set: {particle_filter.n_particles: 1000}}
+  pf_2000: {family: particle_filter, set: {particle_filter.n_particles: 2000}}
+  pf_5000: {family: particle_filter, set: {particle_filter.n_particles: 5000}}
+  rbpf_500: {family: rbpf, set: {particle_filter.n_particles: 500}}
+  rbpf_1000: {family: rbpf, set: {particle_filter.n_particles: 1000}}
+  rbpf_2000: {family: rbpf, set: {particle_filter.n_particles: 2000}}
+  rbpf_5000: {family: rbpf, set: {particle_filter.n_particles: 5000}}
+quick: {runs: 3}

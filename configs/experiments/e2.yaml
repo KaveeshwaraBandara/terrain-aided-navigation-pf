@@ -1,0 +1,10 @@
+description: >
+  E2 — terrain informativeness: per-flight performance against the terrain under that flight.
+runs: 200
+regions: [hill_country, kandy_rolling, north_central_plains]
+set:
+  init.position_sigma: 500
+filters:
+  ekf: {family: ekf}
+  pf_5000: {family: particle_filter, set: {particle_filter.n_particles: 5000}}
+quick: {runs: 3}

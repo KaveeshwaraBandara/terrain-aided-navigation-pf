@@ -1,0 +1,48 @@
+description: >
+  E4 — robustness to model mismatch: radar-altimeter outliers (Gaussian vs Student-t
+  likelihood), map error (correlated DEM error + constant offset; remedies: inflated
+  sigma_z, height-bias state) and INS grade. Run on the two regions where the nominal
+  filter can converge (hill country, Kandy): a robustness test needs a working baseline.
+runs: 100
+regions: [hill_country, kandy_rolling]
+set:
+  init.position_sigma: 500
+quick: {runs: 3}
+studies:
+  outliers:
+    filters:
+      ekf: {family: ekf}
+      pf_5000: {family: particle_filter, set: {particle_filter.n_particles: 5000}}
+      pf_student_t:
+        family: particle_filter
+        set: {particle_filter.n_particles: 5000, particle_filter.likelihood: student_t,
+              particle_filter.nu: 4.0}
+    grid:
+      simulation.outlier_prob: [0.0, 0.01, 0.05, 0.10]
+  map_error:
+    # field std 2.4 m = Copernicus absolute vertical accuracy LE90 4 m / 1.645 (Gaussian
+    # assumption); correlation length 1 km is an assumption, not a handbook figure.
+    set:
+      simulation.map_error.std_m: 2.4
+      simulation.map_error.corr_length_m: 1000.0
+    filters:
+      ekf: {family: ekf}
+      pf_5000: {family: particle_filter, set: {particle_filter.n_particles: 5000}}
+      pf_sz_x2:
+        family: particle_filter
+        set: {particle_filter.n_particles: 5000, particle_filter.meas_sigma: 7.2}
+      pf_sz_x4:
+        family: particle_filter
+        set: {particle_filter.n_particles: 5000, particle_filter.meas_sigma: 14.4}
+      pf_hbias:
+        family: particle_filter
+        set: {particle_filter.n_particles: 5000, particle_filter.height_bias_sigma0: 20.0}
+    grid:
+      simulation.map_error.offset_m: [0.0, 5.0, 10.0, 20.0]
+  ins_grade:
+    filters:
+      dead_reckoning: {family: dead_reckoning}
+      ekf: {family: ekf}
+      pf_5000: {family: particle_filter, set: {particle_filter.n_particles: 5000}}
+    grid:
+      simulation.ins.bias_sigma0: [0.1, 0.3, 1.0]
