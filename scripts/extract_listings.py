@@ -141,7 +141,18 @@ def main() -> None:
     ).stdout
     n_tests = sum(1 for line in collected.splitlines() if "::" in line)
     loc = sum(len(f.read_text().splitlines()) for f in (REPO_ROOT / "src" / "tan").rglob("*.py"))
-    write_macros("implementation", {"NumTests": str(n_tests), "LinesOfCode": fmt(loc, 0)})
+    macros = {"NumTests": str(n_tests), "LinesOfCode": fmt(loc, 0)}
+    bench = REPO_ROOT / "results" / "benchmark" / "runtime.json"
+    if bench.exists():  # the machine the runtimes were measured on
+        import json
+        import platform
+
+        m = json.loads(bench.read_text())["machine_before"]
+        macros["MachineCpu"] = m["cpu_model"].replace("(R)", "").replace("(TM)", "")
+        macros["MachinePython"] = m["python"]
+        macros["MachineNumpy"] = m["numpy"]
+        macros["MachineOs"] = platform.freedesktop_os_release().get("PRETTY_NAME", "Linux")
+    write_macros("implementation", macros)
     print(f"{n_tests} tests, {loc} lines in src/tan")
 
 

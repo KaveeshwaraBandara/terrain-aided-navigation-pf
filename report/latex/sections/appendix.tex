@@ -1,0 +1,38 @@
+\section{Parameters}\label{app:params}
+
+\begin{table}[H]
+  \centering\small
+  \caption{Simulation, sensor, filter and evaluation parameters (defaults; experiments that
+    change one say so). Generated from \texttt{configs/default.yaml} and
+    \texttt{configs/experiments/\_common.yaml}.}\label{tab:params}
+  \input{../tables/parameters.tex}
+\end{table}
+
+\section{Reproducibility}\label{app:repro}
+
+\paragraph{Machine.} All runtimes refer to one laptop: \MachineCpu{} (6 performance and 4
+efficiency cores), 16\,GB RAM, \MachineOs{}, Python \MachinePython{}, NumPy \MachineNumpy{}.
+
+\paragraph{Reproducing everything.} From a fresh clone with an OpenTopography API key in
+\texttt{.env}:
+\begin{lstlisting}[language=bash,numbers=none]
+make setup        # virtual environment + package + test tools
+make test         # unit tests
+make data         # download, reproject and crop the three regions (4 API calls)
+make benchmark    # runtime per filter step (run on an idle machine)
+make experiments  # all Monte Carlo experiments (resumable; about an hour on this laptop)
+make figures      # every figure, table and number in this report, from saved results
+make report       # this PDF (or upload report/ to Overleaf)
+\end{lstlisting}
+\texttt{make quick} runs every experiment with three runs and short flights as a smoke test, and
+\texttt{make smoke} checks the whole pipeline on synthetic terrain without any download.
+Each results folder stores the git commit, the data-manifest checksum, the resolved configuration
+of every experiment cell and the installed package versions; \texttt{data/manifest.json} stores
+SHA-256 checksums of every raster.
+
+\paragraph{Code.} Repository: \texttt{https://github.com/KaveeshwaraBandara/terrain-aided-navigation-pf}.
+
+\paragraph{Data attribution.} Produced using Copernicus WorldDEM-30 \textcopyright{} DLR e.V.
+2010--2014 and \textcopyright{} Airbus Defence and Space GmbH 2014--2018 provided under
+COPERNICUS by the European Union and ESA; all rights reserved. Data accessed through
+OpenTopography.

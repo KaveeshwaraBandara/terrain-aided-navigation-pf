@@ -28,59 +28,79 @@ State `x = [px, py, bx, by]` — position (m, UTM 44N) and INS velocity bias (m/
 
 | Estimator | Role | Status |
 |---|---|---|
-| `ParticleFilter` | SIR (bootstrap) particle filter — main contribution | done |
+| `ParticleFilter` | SIR (bootstrap) particle filter — main contribution; options: Student-t likelihood, measurement-offset state, divergence monitor | done |
+| `RaoBlackwellizedPF` | Marginalised PF: particles carry position, a Kalman filter per particle carries the bias | done |
 | `ExtendedKalmanFilter` | Linearised baseline (DEM slope as Jacobian) | done |
 | `DeadReckoning` | INS only, no terrain — lower bar | done |
 
 ## Study regions
 
-| Key | Area | Terrain |
-|---|---|---|
-| `hill_country` | Central highlands, Nuwara Eliya | rugged — informative |
-| `kandy_rolling` | Around Kandy | moderate |
-| `north_central_plains` | Near Anuradhapura | flat — uninformative |
-| `synthetic` | Random sum-of-Gaussians hills | offline testing, no download |
+Three ≈ 40 km × 40 km boxes of Copernicus GLO-30, chosen by a pre-registered roughness rule
+(`scripts/survey_regions.py`, see `data/README.md`):
+
+| Key | Area | 1 km roughness | Fisher density (10⁻³ m⁻²) |
+|---|---|---|---|
+| `hill_country` | Central highlands, Nuwara Eliya | 64.5 m | 12.9 |
+| `kandy_rolling` | Mid-country around Kandy | 37.7 m | 6.9 |
+| `north_central_plains` | Dry-zone plains, Anuradhapura | 3.5 m | 0.12 |
+| `synthetic` | Random sum-of-Gaussians hills | 62.7 m | 5.6 |
+
+(From `report/tables/terrain_stats.csv`.)
 
 ## Repository layout
 
 ```
-configs/            default.yaml (all parameters), regions.yaml (bounding boxes)
+configs/
+  default.yaml      all model / filter parameters
+  regions.yaml      the three study boxes (written by scripts/survey_regions.py)
+  experiments/      e1..e7 (+ smoke) experiment definitions, _common.yaml shared settings
 src/tan/
+  data.py           OpenTopography download (key never printed), reprojection, crop, manifest
   dem.py            DEM container, vectorised bilinear height + slope, reprojection
-  simulate.py       ground-truth flight + INS / altimeter simulation
-  filters/          base interface, particle filter, resampling, EKF, dead reckoning
-  experiment.py     build DEM + filters, single and Monte Carlo runs
-  metrics.py        RMSE, NEES, convergence time
-  plotting.py       report figures (trajectories, error, ESS, particle snapshots)
-scripts/            download_dem.py, run_experiment.py
-tests/              pytest suite — incl. PF vs exact Kalman filter on planar terrain
-report/             report outline and figures
+  terrain.py        roughness, slope, Fisher information (per region and along a flight)
+  simulate.py       the world: random flights, INS, altimeters, map error; common random numbers
+  filters/          particle filter, RBPF, EKF, dead reckoning, resampling schemes
+  pcrb.py           posterior Cramér–Rao bound with the true noise model
+  metrics.py        convergence, false lock, RMSE, ANEES, Wilson / bootstrap, McNemar
+  runner.py         parallel, resumable Monte Carlo runner
+  analysis/         saved results → report figures, tables and LaTeX macros
+scripts/            survey_regions, download_dem, terrain_stats, sweep, make_figures,
+                    benchmark, validation, extract_listings, run_experiment (quick look)
+tests/              pytest suite — incl. PF / RBPF vs exact Kalman filter on planar terrain
+data/               manifest.json (checksums); rasters are downloaded, not committed
+report/             latex/ (report), figures/, tables/, generated/ (macros), findings.md,
+                    WALKTHROUGH.md
 ```
 
-## Setup
+## Setup and full reproduction
 
 Requires Python ≥ 3.10 (Ubuntu 24.04 ships 3.12; install `python3-venv` if `venv` is missing).
 
 ```bash
 make setup                 # creates .venv and installs the package + dev tools
-source .venv/bin/activate
-make test                  # 35 tests, ~3 s
-make run                   # synthetic terrain → results/<timestamp>_synthetic/
+make test                  # unit tests (~5 s)
+make smoke                 # whole pipeline on synthetic terrain, no download needed
 ```
 
 Real terrain needs a free [OpenTopography](https://opentopography.org) API key:
 
 ```bash
-cp .env.example .env       # paste your key into OPENTOPO_API_KEY
-make data                  # downloads + reprojects every region in configs/regions.yaml
-python scripts/run_experiment.py --region hill_country --runs 50
+cp .env.example .env       # paste your key into OPENTOPO_API_KEY (never commit .env)
+make data                  # 4 API calls: island survey + three regions → data/processed/
+make benchmark             # runtime per filter step (idle machine)
+make experiments           # E1–E7, resumable, ~1 h on a 10-core laptop
+make figures               # every figure / table / LaTeX number from saved results
+make report                # PDF if latexmk exists; otherwise upload report/ to Overleaf
 ```
 
-Any parameter can be overridden from the command line:
+`make quick` runs every experiment with 3 runs and short flights (smoke test). One experiment:
+`python scripts/sweep.py --experiment e3 [--quick] [--jobs 10]` then
+`python scripts/make_figures.py --experiment e3`. Any parameter of the quick-look script can be
+overridden: `python scripts/run_experiment.py --set particle_filter.n_particles=1000`.
 
-```bash
-python scripts/run_experiment.py --set particle_filter.n_particles=1000 init.position_sigma=2000
-```
+**LaTeX report:** `report/latex/main.tex` reads figures, tables and numbers from
+`report/{figures,tables,generated}/`. Without a local TeX installation, upload the whole
+`report/` folder to Overleaf and compile `latex/main.tex` (pdfLaTeX + BibTeX, standard packages).
 
 ## Roadmap
 
