@@ -112,3 +112,11 @@ def test_map_error_offset_shifts_measurements(cfg, synthetic_dem):
     a = simulate(base, cfg["init"], synthetic_dem, run_streams(9, 1))
     b = simulate(off, cfg["init"], synthetic_dem, run_streams(9, 1))
     np.testing.assert_allclose(b.z - a.z, 20.0)
+
+
+def test_flight_plan_fixes_the_flight_but_not_the_noise(cfg, synthetic_dem):
+    sim_cfg = _random_cfg(cfg)
+    a = simulate(sim_cfg, cfg["init"], synthetic_dem, run_streams(3, 0, plan=2))
+    b = simulate(sim_cfg, cfg["init"], synthetic_dem, run_streams(3, 1, plan=2))
+    np.testing.assert_array_equal(a.truth, b.truth)
+    assert not np.allclose(a.z, b.z) and not np.allclose(a.p0_guess, b.p0_guess)

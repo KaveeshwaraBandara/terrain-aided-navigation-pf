@@ -63,9 +63,19 @@ class SimResult:
 
 
 # ---------------------------------------------------------------------- random streams
-def run_streams(seed: int, run: int) -> dict[str, np.random.Generator]:
-    """Independent named generators for Monte Carlo run ``run`` of root seed ``seed``."""
-    return {name: np.random.default_rng([int(seed), int(run), i]) for i, name in enumerate(STREAMS)}
+def run_streams(seed: int, run: int, plan: int | None = None) -> dict[str, np.random.Generator]:
+    """Independent named generators for Monte Carlo run ``run`` of root seed ``seed``.
+
+    With ``plan`` set, the flight stream depends only on (seed, plan): every run then
+    flies the same flight plan with fresh sensor noise and initial error (used for the
+    per-flight PCRB in Experiment 5).
+    """
+    streams = {
+        name: np.random.default_rng([int(seed), int(run), i]) for i, name in enumerate(STREAMS)
+    }
+    if plan is not None:
+        streams["flight"] = np.random.default_rng([int(seed), 0, 500 + int(plan)])
+    return streams
 
 
 def filter_rng(seed: int, run: int, family: str) -> np.random.Generator:

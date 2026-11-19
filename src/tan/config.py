@@ -38,3 +38,29 @@ def load_config(
 
 def load_regions(path: str | Path = REGIONS_FILE) -> dict[str, dict[str, Any]]:
     return load_yaml(path)
+
+
+def dotted_to_nested(flat: dict[str, Any]) -> dict[str, Any]:
+    """{'a.b': 1, 'c': 2} → {'a': {'b': 1}, 'c': 2}."""
+    out: dict[str, Any] = {}
+    for key, value in flat.items():
+        node = out
+        *parents, leaf = str(key).split(".")
+        for p in parents:
+            node = node.setdefault(p, {})
+        node[leaf] = value
+    return out
+
+
+def parse_set(items: list[str]) -> dict[str, Any]:
+    """Turn ['a.b=1', 'c=x'] into {'a': {'b': 1}, 'c': 'x'} (values parsed as YAML)."""
+    return dotted_to_nested({k: yaml.safe_load(v) for k, _, v in (i.partition("=") for i in items)})
+
+
+def get_dotted(cfg: dict[str, Any], key: str, default: Any = None) -> Any:
+    node: Any = cfg
+    for part in key.split("."):
+        if not isinstance(node, dict) or part not in node:
+            return default
+        node = node[part]
+    return node

@@ -67,6 +67,15 @@ def terrain_stats(dem: DEM, meas_sigma: float = 3.6, window_m: float = 1000.0) -
     }
 
 
+def roughness_dem(dem: DEM, window_m: float = 1000.0) -> DEM:
+    """Grid of 1 km local std as a DEM (for bilinear lookups), cached on ``dem``."""
+    cache = dem.__dict__.setdefault("_roughness_cache", {})
+    if window_m not in cache:
+        grid = local_std(dem.elevation, window_px_for(dem.res, window_m))
+        cache[window_m] = DEM(grid, x0=dem.x0, y0=dem.y0, res=dem.res)
+    return cache[window_m]
+
+
 def along_track_stats(
     dem: DEM, xy: np.ndarray, meas_sigma: float = 3.6, window_m: float = 1000.0
 ) -> dict[str, float]:
@@ -80,8 +89,7 @@ def along_track_stats(
     x, y = xy[:, 0], xy[:, 1]
     heights = dem.height(x, y)
     gx, gy = dem.gradient(x, y)
-    rough_grid = local_std(dem.elevation, window_px_for(dem.res, window_m))
-    rough = DEM(rough_grid, x0=dem.x0, y0=dem.y0, res=dem.res).height(x, y)
+    rough = roughness_dem(dem, window_m).height(x, y)
 
     # unit vectors along and across the local direction of travel
     d = np.gradient(xy, axis=0)

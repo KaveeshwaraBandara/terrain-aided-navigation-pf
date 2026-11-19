@@ -15,23 +15,10 @@ from datetime import datetime
 import numpy as np
 import yaml
 
-from tan.config import DEFAULT_CONFIG, REPO_ROOT, load_config
+from tan.config import DEFAULT_CONFIG, REPO_ROOT, load_config, parse_set
 from tan.experiment import run_monte_carlo
 from tan.metrics import summarize
 from tan.plotting import plot_errors, plot_ess, plot_particle_snapshots, plot_trajectories
-
-
-def parse_set(items: list[str]) -> dict:
-    """Turn ['a.b=1', 'c=x'] into {'a': {'b': 1}, 'c': 'x'} (values parsed as YAML)."""
-    out: dict = {}
-    for item in items:
-        key, _, raw = item.partition("=")
-        node = out
-        *parents, leaf = key.split(".")
-        for p in parents:
-            node = node.setdefault(p, {})
-        node[leaf] = yaml.safe_load(raw)
-    return out
 
 
 def main() -> None:

@@ -1,0 +1,16 @@
+# Settings shared by every experiment in configs/experiments/ (applied before each
+# experiment's own `set`): 300 s flights at 40 m/s, randomised.
+set:
+  simulation.flight.mode: random          # random start, heading and weave phase per run
+  simulation.flight.margin_sigma0: 2000.0 # flight stays 3 x 2000 m inside the map for every σ₀
+  simulation.altitude_reference: corridor # altitude = highest terrain within 1 km of the track
+  simulation.corridor_halfwidth_m: 1000.0 #   ... plus simulation.clearance_m
+  simulation.duration: 300.0
+  simulation.speed: 40.0
+  particle_filter.snapshot_every: 0       # particle clouds are stored only for figure runs
+  experiment.tracking_window_s: 100.0
+
+# --quick: short flights for smoke tests (each experiment also sets runs: 3)
+quick:
+  set:
+    simulation.duration: 150.0
