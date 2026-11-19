@@ -17,4 +17,4 @@ def update(self, z: float) -> None:
         new = self.log_weights + loglik
         evidence = logsumexp(new)
     self._last_log_evidence = float(evidence)
-    self.log_weights = new - evidence  # keep Σ w_i = 1 in log form
+    self.log_weights = new - evidence  # keep sum w_i = 1 in log form

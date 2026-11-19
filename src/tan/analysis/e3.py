@@ -353,6 +353,12 @@ def make(exp: str = "e3", quick: bool = False) -> None:
         [x for x in sorted(ro["particle_filter.roughening"].unique()) if x != 0.0],
         "roughening",
     )
+    res_p = [r[5] for r in tcsv if str(r[0]).startswith("resampling")]
+    if res_p:
+        macros["EThreeResMinP"] = fmt(min(res_p), 2)
+    for r in tcsv:
+        if r[0] == "roughening" and float(r[2]) == 0.05:
+            macros["EThreeRoughLost"], macros["EThreeRoughGained"] = str(r[3]), str(r[4])
     out.table(
         "tests",
         ["Study", "Comparison", "Only A", "Only B", "$p$ (McNemar)"],
@@ -383,6 +389,8 @@ def make(exp: str = "e3", quick: bool = False) -> None:
         for s in SCHEMES:
             macros[macro_name("e3 var", s, WORDS[n])] = fmt(v[s], 3)
         macros[macro_name("e3 var floor", WORDS[n])] = fmt(v["lower_bound"], 3)
+        macros[macro_name("e3 var multinomial theory", WORDS[n])] = fmt(v["multinomial_theory"], 2)
+        macros[macro_name("e3 var residual theory", WORDS[n])] = fmt(v["residual_theory"], 2)
     out.table(
         "offspring_variance",
         [

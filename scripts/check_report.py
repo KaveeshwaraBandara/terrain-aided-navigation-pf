@@ -31,6 +31,7 @@ GENERATED_PREFIXES = (
     "NumTests",
     "LinesOfCode",
     "Machine",
+    "Vis",
 )
 
 
@@ -95,6 +96,19 @@ def main() -> int:
             text_mode = re.sub(r"\$[^$]*\$", "", line)  # drop inline maths
             if not line.startswith("%") and re.search(r"(?<!\\)_", text_mode):
                 errors.append(f"unescaped _ outside maths in {t.name}:{i}")
+
+    # characters LaTeX (utf8 + T1, plus the \newunicodechar declarations) cannot typeset
+    declared = set(re.findall(r"\\newunicodechar\{(.)\}", (LATEX / "main.tex").read_text()))
+    allowed = declared | set("éèöüäáíóúñçÖÜÄÉ—–")
+    sources = list(texts.items()) + [
+        (t, strip_comments(t.read_text())) for t in (REPO_ROOT / "report" / "tables").glob("*.tex")
+    ]
+    for f, t in sources:
+        for ch in sorted({c for c in t if ord(c) > 127} - allowed):
+            errors.append(f"unsupported character {ch!r} (U+{ord(ch):04X}) in {f.name}")
+    for f in (REPO_ROOT / "report" / "generated").glob("code_*.py"):
+        if any(ord(c) > 127 for c in f.read_text()):
+            errors.append(f"non-ASCII character in listing {f.name}")
 
     for e in errors:
         print("ERROR:", e)

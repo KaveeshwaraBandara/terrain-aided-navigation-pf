@@ -33,6 +33,35 @@ EXCERPTS = {
 }
 
 
+ASCII = {
+    "Σ": "sum",
+    "σ": "sigma",
+    "−": "-",
+    "→": "->",
+    "×": "x",
+    "≈": "~",
+    "²": "^2",
+    "₀": "0",
+    "ᵀ": "^T",
+    "⁻": "^-",
+    "√": "sqrt",
+    "≥": ">=",
+    "≤": "<=",
+    "—": "--",
+    "–": "-",
+    "…": "...",
+}
+
+
+def to_ascii(text: str) -> str:
+    """LaTeX listings cannot typeset multibyte UTF-8 characters: transliterate them."""
+    out = "".join(ASCII.get(ch, ch) for ch in text)
+    bad = {ch for ch in out if ord(ch) > 127}
+    if bad:
+        raise ValueError(f"no ASCII replacement for {bad}")
+    return out
+
+
 def strip_docstring(src: str) -> str:
     tree = ast.parse(src)
     fn = tree.body[0]
@@ -114,7 +143,7 @@ def main() -> None:
     for name, obj in EXCERPTS.items():
         src = textwrap.dedent(inspect.getsource(obj))
         out = GENERATED / f"code_{name}.py"
-        out.write_text(strip_docstring(src))
+        out.write_text(to_ascii(strip_docstring(src)))
         print(out)
 
     cfg = resolved_defaults()

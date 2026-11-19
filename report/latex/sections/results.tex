@@ -30,7 +30,7 @@ scale of a few cells --- a difference that turns out to matter for the EKF.
   \end{subfigure}
   \caption{Study regions. Boxes in (a) were selected by the pre-registered roughness rule;
     (b) shows the 30\,m Copernicus GLO-30 elevation (colour) with hillshading. Note the different
-    elevation scales: the plains span only 127\,m.}\label{fig:regions}
+    elevation scales: the plains span only \TerrPlainsElevRangeM\,m.}\label{fig:regions}
 \end{figure}
 
 \begin{table}[t]
@@ -187,11 +187,11 @@ linear in $N$; even $N = 50\,000$ needs only \EThreeNFiftyKMs\,ms per step on on
 orders of magnitude inside the real-time budget of a 1\,Hz altimeter.
 
 \paragraph{Resampling.} The four schemes do not differ significantly in convergence (McNemar
-$p \ge 0.15$ against systematic at both $N$; \cref{tab:e3tests}) or tracking RMSE (overlapping
+$p \ge \EThreeResMinP$ against systematic at both $N$; \cref{tab:e3tests}) or tracking RMSE (overlapping
 intervals, \cref{fig:e3design}). The schemes do differ in what they are designed to differ in:
 measured directly, the variance of the offspring counts (\cref{tab:e3var}) is
-\EThreeVarMultinomialFiveK{} for multinomial (theory 1.00), \EThreeVarResidualFiveK{} for residual
-(theory 0.44), \EThreeVarStratifiedFiveK{} for stratified and \EThreeVarSystematicFiveK{} for
+\EThreeVarMultinomialFiveK{} for multinomial (theory \EThreeVarMultinomialTheoryFiveK), \EThreeVarResidualFiveK{} for residual
+(theory \EThreeVarResidualTheoryFiveK), \EThreeVarStratifiedFiveK{} for stratified and \EThreeVarSystematicFiveK{} for
 systematic resampling --- the last equal to the minimum possible for any unbiased scheme
 (\EThreeVarFloorFiveK, attained when every count is $\lfloor N w\rfloor$ or $\lceil N w\rceil$).
 This matches Hol, Schön and Gustafsson~\cite{hol2006}, who found stratified and residual
@@ -207,8 +207,8 @@ changes the number of resampling steps per flight from \EThreeEssZeroPointOneRes
 
 \paragraph{Roughening.} Roughening has by far the largest effect of the design choices
 (\cref{fig:e3design}, right). A small jitter, $K = 0.05$, raises convergence from
-\EThreeRoughZeroPointZeroZeroConv\,\% to \EThreeRoughZeroPointZeroFiveConv\,\% (McNemar: 24 runs
-gained, 1 lost, $p < 10^{-4}$) and also lowers the tracking RMSE (\EThreeRoughZeroPointZeroFiveTrack{}
+\EThreeRoughZeroPointZeroZeroConv\,\% to \EThreeRoughZeroPointZeroFiveConv\,\% (McNemar: \EThreeRoughGained{} runs
+gained, \EThreeRoughLost{} lost, $p < 10^{-4}$) and also lowers the tracking RMSE (\EThreeRoughZeroPointZeroFiveTrack{}
 vs.\ \EThreeRoughZeroPointZeroZeroTrack\,m); $K = 0.1$ gives \EThreeRoughZeroPointOneZeroConv\,\%
 and $K = 0.2$ falls back to \EThreeRoughZeroPointTwoZeroConv\,\%. With $K = 0.05$, 5\,000 particles
 match 20\,000 particles without roughening at a quarter of the cost. Because the jitter is
@@ -320,7 +320,7 @@ simulation (\cref{sec:pcrb}).
 \end{figure}
 
 \paragraph{The bound and ambiguity.} The posterior Cramér--Rao bound is never violated: over all
-regions, $\sigma_0$ and filters the all-run RMSE is at least 1.1 times the bound at every time step
+regions, $\sigma_0$ and filters the all-run RMSE is at least \EFiveMinRatioAll{} times the bound at every time step
 (\cref{tab:e5cons}), a useful end-to-end check of the simulation, the filters and the bound. How
 far above the bound the filters are depends on ambiguity (\cref{fig:e5bound}). The bound drops to
 a few metres within seconds on the hilly regions (\EFiveHillSFiveZeroZeroBound\,m in the tracking
@@ -386,7 +386,7 @@ rather than at the truth.
 was tuned on separate development seeds ($M = \ESixDevRuns$ per cell; \cref{tab:e6dev}) with a
 rule fixed in advance: the best convergence at $\sigma_0 = 2$\,km among settings with at most
 5\,\% of runs raising an alarm at $\sigma_0 = 250$\,m. No setting met that constraint (the lowest
-was 8\,\%), so --- decided on the development data before the test runs, and recorded as such ---
+was \ESixDevMinFa\,\%), so --- decided on the development data before the test runs, and recorded as such ---
 the setting with the fewest false alarms was taken: window $L = \ESixWindow$, $p_{\mathrm{FA}} =
 \ESixPfa$. The test on the main seeds ($M = \ESixTestRuns$) compares, on identical flights, the
 plain PF ($N = 5\,000$), the PF with the monitor, the PF with roughening ($K = 0.05$, the value
@@ -438,16 +438,16 @@ $N$ (\cref{tab:runtime}), so equal $N$ is also equal runtime (\cref{fig:e7rt}).
   \includegraphics[width=\textwidth]{e7_equal_n.pdf}
   \caption{E7: plain PF vs.\ RBPF at equal particle count: convergence (top), tracking RMSE
     (middle) and RMS error of the INS-bias estimate in the tracking window (bottom; the prior
-    alone gives 0.42\,m/s). $M = \ESevenRuns$, $\sigma_0 = 1$\,km, 95\,\% intervals.}\label{fig:e7}
+    alone gives \ESevenPriorBias\,m/s). $M = \ESevenRuns$, $\sigma_0 = 1$\,km, 95\,\% intervals.}\label{fig:e7}
 \end{figure}
 
 On the hilly regions the RBPF converges about as often as the plain PF (no significant difference,
-McNemar $p \ge 0.09$; \cref{tab:e7}); on the plains it converges more often at every $N$
+McNemar $p \ge \ESevenHillyMinP$; \cref{tab:e7}); on the plains it converges more often at every $N$
 (\ESevenPlainsRbpfNTwoZeroZeroZeroConv\,\% vs.\ \ESevenPlainsPfNTwoZeroZeroZeroConv\,\% at
-$N = 2\,000$, $p = 0.008$). Its clearest advantage is in the quantity it computes exactly
+$N = 2\,000$, $p = \ESevenPlainsNTwoZeroZeroZeroP$). Its clearest advantage is in the quantity it computes exactly
 (\cref{fig:e7}): with $N = 5\,000$ on the hill country its bias estimate has an RMS error of
 \ESevenHillRbpfNFiveZeroZeroZeroBias\,m/s, against \ESevenHillPfNFiveZeroZeroZeroBias\,m/s for the
-plain PF --- whose bias estimate is \emph{no better than the prior} (0.42\,m/s). This is the
+plain PF --- whose bias estimate is \emph{no better than the prior} (\ESevenPriorBias\,m/s). This is the
 well-known impoverishment of an almost static parameter: the bias changes by only 0.002\,m/s
 per step, so after repeated resampling all particles' bias values descend from a few ancestors,
 and the estimate is roughly one random draw from the prior. The RBPF never samples the bias and
@@ -470,10 +470,9 @@ lowest-index E1 run on the hill country with $\sigma_0 = 2$\,km in which the 20\
 converged after at least 60\,s and the EKF did not. It was re-simulated from its seeds with the
 particle cloud recorded, reproducing the saved run exactly. Five seconds after take-off the cloud
 has fragmented into clusters along terrain contours --- the multimodal posterior the EKF cannot
-represent. By 20\,s it has collapsed onto one tight cluster some 100--150\,m from the truth, a
-temporarily wrong mode, and between 60 and 150\,s the measurements move it onto the truth, where
-it stays. Meanwhile the EKF confidently follows the wrong slope away from the truth and ends
-further off than dead reckoning. An animation of this run (\texttt{report/figures/visuals\_animation.mp4})
+represent. By 20\,s it has collapsed onto one tight cluster \VisErrTwenty\,m from the truth, a
+temporarily wrong mode (\VisErrSixty\,m at 60\,s); from \VisConvTime\,s on its error stays below 50\,m. Meanwhile the EKF confidently follows the wrong slope away from the truth and ends
+\VisEkfFinal\,km off, further than dead reckoning (\VisDrFinal\,km). An animation of this run (\texttt{report/figures/visuals\_animation.mp4})
 is in the repository.
 
 \begin{figure}[t]

@@ -20,7 +20,7 @@ from ..experiment import build_dem, make_filter, run_filter
 from ..plotting import INK, TEXT_WIDTH_IN, add_scale_bar, report_style, save_report, style_of
 from ..runner import results_dir
 from ..simulate import filter_rng, run_streams, simulate
-from .common import REGION_LABELS, Output, load_summary
+from .common import REGION_LABELS, Output, fmt, load_summary
 from .e5 import resolved_cfg
 
 SIGMA = "init.position_sigma"
@@ -81,6 +81,16 @@ def make(exp: str = "visuals", quick: bool = False) -> None:
         ),
     }
     (out.root / "figures").mkdir(parents=True, exist_ok=True)
+    out.macros(
+        {
+            "VisRun": str(run),
+            "VisConvTime": fmt(info["convergence_time_s"], 0),
+            "VisErrTwenty": fmt(float(pf.error[19]), 0),
+            "VisErrSixty": fmt(float(pf.error[59]), 0),
+            "VisEkfFinal": fmt(float(ekf.error[-1]) / 1e3, 1),
+            "VisDrFinal": fmt(float(dr.error[-1]) / 1e3, 1),
+        }
+    )
     (out.root / "figures" / f"{exp}_run.json").write_text(json.dumps(info, indent=2))
 
     # ------------------------------------------------------------ snapshots

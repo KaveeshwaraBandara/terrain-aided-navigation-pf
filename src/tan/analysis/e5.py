@@ -179,6 +179,7 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                 float(np.mean(ens[(region, s, "bound")][win])), 1
             )
             macros["EFiveAneesLo"], macros["EFiveAneesHi"] = fmt(lo_b, 2), fmt(hi_b, 2)
+    macros["EFiveMinRatioAll"] = fmt(min(r[11] for r in tcsv), 2)
     out.table(
         "consistency",
         [

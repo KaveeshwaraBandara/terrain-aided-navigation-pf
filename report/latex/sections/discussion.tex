@@ -26,7 +26,8 @@ orders of magnitude inside the 1\,Hz measurement interval (E3).
 \subsection{Terrain decides}
 The three regions differ by two orders of magnitude in the information one altimeter sample
 carries (\cref{tab:terrain}), and that ordering carries through every experiment. Over the hills
-the particle filter tracks at 6--10\,m; over the plains at about 20--25\,m, close to the posterior
+the 20\,000-particle filter tracks at \EOneHillSFiveZeroZeroPfTwoZeroZeroZeroZeroTrack\,m (hill country,
+$\sigma_0 = 500$\,m); over the plains at \EOnePlainsSFiveZeroZeroPfTwoZeroZeroZeroZeroTrack\,m, close to the posterior
 bound there (E5). The plains also show the most desirable property of a Bayesian filter: when the
 terrain says little, the particle filter's covariance stays wide and it almost never locks
 falsely (E1), so a navigation system could trust its own uncertainty and fall back on other
@@ -93,7 +94,7 @@ uninformative while the posterior is multimodal.
 \begin{itemize}
   \item \textbf{Simulated sensors and flights.} No real flight data were used. The altimeter noise
         (2\,m barometric, 3\,m radar, white and range-independent) is an assumption, and an
-        optimistic one at the 1--1.7\,km radar ranges the corridor altitude produces over the
+        optimistic one at the radar ranges of up to \EOneRadarHillMax\,m that the corridor altitude produces over the
         hills (E1).
   \item \textbf{Simplified flight.} Constant altitude and a horizontal 2-D state; attitude, height
         and their errors are not estimated, and the INS model is a velocity bias plus white noise.

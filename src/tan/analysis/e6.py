@@ -123,6 +123,9 @@ def make(exp: str = "e6", quick: bool = False) -> None:
         path.write_text(json.dumps(choice, indent=2))
         print(f"[{exp}] dev choice: {choice} → {path}")
         macros["ESixWindow"] = str(best["window"])
+        macros["ESixDevMinFa"] = pct(min(r["false_alarm_low"]["rate"] for r in rows))
+        macros["ESixDevBestFa"] = pct(best["false_alarm_low"]["rate"])
+        macros["ESixDevBestConv"] = pct(best["conv_high"]["rate"])
         macros["ESixPfa"] = fmt(best["false_alarm_prob"], 3)
         macros["ESixDevRuns"] = str(int(dev["run"].nunique()))
 

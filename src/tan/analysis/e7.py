@@ -191,5 +191,15 @@ def make(exp: str = "e7", quick: bool = False) -> None:
         csv_rows=csv_rows,
     )
     macros["ESevenRuns"] = str(int(df.groupby(["config", "filter"]).size().min()))
+    from ..config import load_config
+
+    b0 = float(load_config()["simulation"]["ins"]["bias_sigma0"])
+    macros["ESevenPriorBias"] = fmt(np.sqrt(2.0) * b0, 2)  # 2-D RMS of the prior
+    hilly = [r[10] for r in csv_rows if r[0] != "north_central_plains"]
+    macros["ESevenHillyMinP"] = fmt(min(hilly), 2)
+    for r in csv_rows:
+        macros[macro_name("e7", REGION_SHORT.get(r[0], r[0]), f"n{r[1]}", "p")] = (
+            "<0.001" if r[10] < 1e-3 else fmt(r[10], 3)
+        )
     out.macros(macros)
     print(f"[{exp}] figures, tables and macros written to {out.root}")

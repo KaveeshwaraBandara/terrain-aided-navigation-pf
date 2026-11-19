@@ -9,7 +9,9 @@ experiments. The main conclusions are:
         strongly than synthetic terrain.} The EKF's local linearisation breaks down at initial
         errors of about 100\,m over real hills (\EOneHillSOneZeroZeroEkfConv\,\% convergence) and
         then performs worse than no terrain aiding, while the particle filter converges reliably up
-        to about 1\,km and tracks at 6--10\,m.
+        to about 1\,km (\EOneHillSOneZeroZeroZeroPfTwoZeroZeroZeroZeroConv\,\% with 20\,000 particles)
+        and tracks at \EOneHillSFiveZeroZeroPfTwoZeroZeroZeroZeroTrack--\EOneKandySFiveZeroZeroPfTwoZeroZeroZeroZeroTrack\,m
+        over the hills.
   \item \textbf{Terrain decides what is possible.} Performance follows the terrain information
         under the flight, for regions and for individual flights; over flat plains the particle
         filter stays honestly uncertain instead of locking falsely.
