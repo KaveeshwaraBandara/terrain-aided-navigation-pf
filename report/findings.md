@@ -18,6 +18,28 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — Pre-registered region-selection rule (written before the survey ran)
+
+Goal: three ~40 km × 40 km boxes of contrasting terrain, chosen by terrain statistics only
+(never by filter results), so the terrain comparison cannot be tuned to a narrative.
+
+- Survey data: one COP90 request covering Sri Lanka (S 5.85, N 9.90, W 79.50, E 82.00).
+- Candidates: 0.36° × 0.36° boxes with corners on a 0.02° grid that contain the class's anchor
+  town at least 0.06° inside every edge. Anchors (approximate town centres):
+  Nuwara Eliya 6.950 N 80.789 E, Kandy 7.291 N 80.634 E, Anuradhapura 8.311 N 80.404 E.
+- Score: mean 1 km roughness (std of elevation in a ≈1 km moving window), over land cells.
+- Rule: rugged = highest roughness around Nuwara Eliya; flat = lowest roughness around
+  Anuradhapura; moderate = around Kandy, overlapping neither, roughness closest in log terms to
+  the geometric mean of the other two. Every box must have < 1 % no-data/sea.
+- Implemented in `scripts/survey_regions.py`; all candidates and scores go to
+  `report/tables/region_selection.csv`.
+
+Other decisions today:
+- The key's presence is checked by the download script itself, which never prints it.
+- The LaTeX report will be Overleaf-ready only (owner's choice, no local TeX installation).
+
+---
+
 ## 2026-11-04 — Filters implemented and validated (synthetic terrain)
 
 Setup unless stated otherwise: `configs/default.yaml` — synthetic terrain (60 Gaussian hills,
