@@ -19,6 +19,7 @@ from .common import (
     fmt,
     load_summary,
     macro_name,
+    plain_log_ticks,
     pooled_rmse,
     rate,
     regions_in,
@@ -73,6 +74,7 @@ def make(exp: str = "e7", quick: bool = False) -> None:
                     ax.fill_between(Ns, lo, hi, color=st["color"], alpha=0.15, lw=0)
                     ax.plot(Ns, y, color=st["color"], ls=st["ls"], marker="o", ms=3, label=label)
                 ax.set_xscale("log")
+                plain_log_ticks(ax, "x", ticks=(500, 1000, 2000, 5000))
                 if i == 0:
                     ax.set_title(REGION_LABELS.get(region, region))
                     ax.set_ylim(-3, 103)
@@ -110,6 +112,7 @@ def make(exp: str = "e7", quick: bool = False) -> None:
                         label="PF" if kind == "pf" else "RBPF",
                     )
                 ax.set_xscale("log")
+                plain_log_ticks(ax, "x", ticks=(0.2, 0.3, 0.5, 0.8))
                 ax.set_ylim(-3, 103)
                 ax.set_title(REGION_LABELS.get(region, region))
                 ax.set_xlabel("Runtime per step (ms)")

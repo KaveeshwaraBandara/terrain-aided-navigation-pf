@@ -18,6 +18,27 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — E7: Rao-Blackwellised PF vs plain PF (σ₀ = 1 km, M = 100 per cell)
+
+Equal N is also equal runtime here (benchmark: RBPF 0.83 ms vs PF 0.83 ms per step at N = 5 000).
+- **Convergence:** no significant difference on the hilly regions (McNemar p ≥ 0.09); on the
+  plains the RBPF converges more often at every N (34/47/56/62 % vs 27/36/39/52 % for N = 500 …
+  5 000; p = 0.008 at N = 2 000, 0.12–0.28 otherwise).
+- **Tracking RMSE (N ≥ 2 000):** RBPF 7.9 / 7.0 m vs PF 9.2 / 8.6 m (hill), 8.8 / 7.6 vs
+  11.4 / 10.5 m (Kandy).
+- **Bias estimation — the clearest effect:** tracking-window bias RMSE (2-D) RBPF 0.19–0.33 m/s vs
+  PF 0.43–0.58 m/s on the hilly regions at N ≥ 2 000. The prior alone gives 0.42 m/s
+  (√2 × 0.3), so **the plain PF's bias estimate is no better than the prior — often worse**. This is
+  static-parameter impoverishment: the bias random walk (0.002 m/s per step) is tiny, so after
+  repeated resampling all bias values descend from a few ancestors and the estimate is roughly
+  one random draw from the prior (expected 2-D error ≈ √2 × 0.42 ≈ 0.6 m/s). The RBPF computes the
+  bias analytically and cannot impoverish. On the plains, where the PF resamples less (flatter
+  weights), its bias error stays near the prior (0.27–0.37 m/s).
+- At N = 500 the RBPF's bias error is no better (wide CI): with few particles the per-particle
+  Kalman means are driven by few, noisy position increments.
+
+---
+
 ## 2026-11-19 — E6 dev study (seed root 1000, M = 100 per cell): monitor parameters chosen
 
 | window L | p_FA | converged at 2 km (pooled) | false alarms at 250 m (pooled) |
