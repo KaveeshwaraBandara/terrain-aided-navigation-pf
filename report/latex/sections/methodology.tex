@@ -1,0 +1,297 @@
+\section{Methodology}\label{sec:method}
+
+\subsection{Recursive Bayesian estimation}
+The navigation state at time step $k$ is
+\begin{equation}
+  \x_k = \begin{bmatrix} \p_k \\ \bias_k \end{bmatrix}
+       = \begin{bmatrix} p_{x,k} & p_{y,k} & b_{x,k} & b_{y,k} \end{bmatrix}\T,
+\end{equation}
+the horizontal position $\p_k$ (easting and northing in UTM zone~44N, metres) and the
+velocity bias $\bias_k$ of the inertial navigation system (INS, m/s). Given the INS
+outputs $\uu_{1:k}$ and the terrain-height measurements $z_{1:k}$, the goal is the filtering
+density $p(\x_k \mid z_{1:k})$, computed by the Bayes recursion~\cite{arulampalam2002,sarkka2023}
+\begin{align}
+  p(\x_k \mid z_{1:k-1}) &= \int p(\x_k \mid \x_{k-1}, \uu_k)\,
+                            p(\x_{k-1} \mid z_{1:k-1})\, d\x_{k-1}
+                            && \text{(prediction)} \label{eq:chapman}\\
+  p(\x_k \mid z_{1:k}) &= \frac{p(z_k \mid \x_k)\, p(\x_k \mid z_{1:k-1})}
+                               {p(z_k \mid z_{1:k-1})}
+                            && \text{(update)}. \label{eq:bayes}
+\end{align}
+Every estimator in this project implements \eqref{eq:chapman}--\eqref{eq:bayes} under a
+different approximation: the particle filter with a weighted sample, the EKF with a Gaussian
+obtained by linearising the terrain, and dead reckoning by skipping the update.
+
+\subsection{System and sensor models}\label{sec:models}
+
+\paragraph{Inertial navigation (motion model).}
+The INS delivers a velocity $\uu_k = \vect{v}_k + \bias_k + \vect{n}_k$, i.e.\ the true
+velocity corrupted by a slowly wandering bias and white noise. Integrating
+$\vect{v}_k = \uu_k - \bias_k - \vect{n}_k$ over a step $\Delta t$ and modelling the bias as a
+random walk gives the linear motion model
+\begin{equation}
+  \x_k = F\x_{k-1} + G\uu_k + \vect{w}_k,\qquad
+  F = \begin{bmatrix} I_2 & -\Delta t\, I_2 \\ 0 & I_2 \end{bmatrix},\quad
+  G = \begin{bmatrix} \Delta t\, I_2 \\ 0 \end{bmatrix}.
+  \label{eq:motion}
+\end{equation}
+\Cref{eq:motion} is exact for the simulated world (\cref{sec:sim}) when $\vect{w}_k$ is the
+correlated noise derived in \cref{sec:pcrb}. The filters use the simpler diagonal
+$Q = \mathrm{diag}(\sigma_p^2 I_2, \sigma_b^2 I_2)$ with $\sigma_p = 2$\,m per step, much
+larger than the true position noise ($\approx 0.05$\,m per step): a deliberate tuning choice
+that keeps the particle cloud diverse and absorbs unmodelled effects. This matters when the
+filters' error is compared with the bound in \cref{sec:pcrb}.
+
+\paragraph{Altimeters (measurement model).}
+A barometric altimeter measures the altitude above mean sea level, $a_k + e_{b,k}$, and a radar
+altimeter the height above the surface below, $a_k - h(\p_k) + e_{r,k}$. Their difference
+cancels the unknown altitude $a_k$:
+\begin{equation}
+  z_k = \underbrace{(a_k + e_{b,k})}_{\text{baro}} - \underbrace{(a_k - h(\p_k) + e_{r,k})}_{\text{radar}}
+      = h(\p_k) + v_k,\qquad v_k = e_{b,k} - e_{r,k} \sim \N(0, \sigma_z^2),
+  \label{eq:meas}
+\end{equation}
+with $\sigma_z^2 = \sigma_{\mathrm{baro}}^2 + \sigma_{\mathrm{radar}}^2 = 2^2 + 3^2$\,m$^2$
+($\sigma_z \approx 3.6$\,m). Both noise levels, their whiteness and their independence of
+range are \emph{assumptions} of this study, not values from a sensor datasheet. The terrain
+height $h(\p)$ is read from the digital elevation model (DEM) by bilinear interpolation, which
+is exact for a plane and continuous everywhere. The likelihood $p(z_k \mid \x_k) =
+\N(z_k; h(\p_k), \sigma_z^2)$ is a nonlinear function of position and, because many places
+share the same height, it is \emph{multimodal}: a single measurement constrains the position
+only to a contour line of the terrain.
+
+\subsection{The bootstrap (SIR) particle filter}\label{sec:pf}
+A particle filter represents the posterior by $N$ weighted samples
+$\{\x_k^{(i)}, w_k^{(i)}\}_{i=1}^N$,
+$p(\x_k \mid z_{1:k}) \approx \sum_i w_k^{(i)} \delta(\x_k - \x_k^{(i)})$
+\cite{gordon1993,arulampalam2002,doucet2011}. With samples drawn from a proposal
+$q(\x_k \mid \x_{k-1}^{(i)}, z_k)$, sequential importance sampling gives the weight recursion
+\begin{equation}
+  w_k^{(i)} \propto w_{k-1}^{(i)}\,
+  \frac{p(z_k \mid \x_k^{(i)})\, p(\x_k^{(i)} \mid \x_{k-1}^{(i)})}
+       {q(\x_k^{(i)} \mid \x_{k-1}^{(i)}, z_k)}.
+\end{equation}
+The \emph{bootstrap} filter of Gordon, Salmond and Smith~\cite{gordon1993} uses the motion
+model as the proposal, $q = p(\x_k \mid \x_{k-1})$, so the weight update reduces to the
+likelihood:
+\begin{equation}
+  \x_k^{(i)} \sim p(\x_k \mid \x_{k-1}^{(i)}, \uu_k),\qquad
+  w_k^{(i)} \propto w_{k-1}^{(i)}\, p(z_k \mid \x_k^{(i)}).
+  \label{eq:sir}
+\end{equation}
+Each particle carries its own bias hypothesis $\bias^{(i)}$ and integrates the INS velocity
+corrected by it; particles with a wrong bias drift away from the terrain that matches the
+measurements and lose weight, so the bias is estimated without being measured.
+
+\paragraph{Log-domain weights.} A residual of 50\,m at $\sigma_z = 3.6$\,m multiplies a weight by
+$e^{-96}$; a few such factors underflow double precision. The filter therefore stores
+$\ell^{(i)} = \log w^{(i)}$ and normalises with the log-sum-exp identity
+\begin{equation}
+  \ell^{(i)} \leftarrow \ell^{(i)} - \log\sum_j e^{\ell^{(j)}}, \qquad
+  \log\sum_j e^{\ell^{(j)}} = m + \log\sum_j e^{\ell^{(j)} - m},\; m = \max_j \ell^{(j)}.
+\end{equation}
+The normaliser $\log\sum_j w_{k-1}^{(j)} p(z_k\mid\x_k^{(j)})$ is the Monte Carlo estimate of
+the log evidence $\log p(z_k \mid z_{1:k-1})$ in \eqref{eq:bayes}; it is logged for the
+divergence monitor of \cref{sec:monitor}.
+
+\paragraph{Estimate.} The minimum mean-square-error estimate and its covariance are
+\begin{equation}
+  \hat\x_k = \sum_i w_k^{(i)} \x_k^{(i)},\qquad
+  P_k = \sum_i w_k^{(i)} (\x_k^{(i)} - \hat\x_k)(\x_k^{(i)} - \hat\x_k)\T .
+\end{equation}
+When the posterior is multimodal the mean can lie between modes, where there are no
+particles; this is expected behaviour of the MMSE estimate, not an error.
+
+\paragraph{Degeneracy and resampling.} Repeated multiplication by likelihoods concentrates the
+weight on a few particles. The effective sample size
+\begin{equation}
+  \Neff = \frac{1}{\sum_i (w_k^{(i)})^2} \in [1, N]
+\end{equation}
+measures this; when $\Neff < \tau N$ (default $\tau = 0.5$) the filter \emph{resamples}: it
+draws $N$ new particles with replacement, particle $i$ receiving $N_i$ copies with
+$\E[N_i] = N w^{(i)}$, and resets the weights to $1/N$. Four unbiased schemes are
+implemented~\cite{hol2006}; they differ in the variance of $N_i$, which is extra noise added to
+the estimate:
+\begin{itemize}
+  \item \textbf{multinomial}: $N$ independent draws from $\mathrm{Categorical}(w)$, so
+        $N_i \sim \mathrm{Bin}(N, w^{(i)})$ and $\mathrm{Var}(N_i) = N w^{(i)}(1-w^{(i)})$;
+  \item \textbf{stratified}: one uniform draw in each stratum, $u_j = (j - 1 + U_j)/N$;
+  \item \textbf{systematic}: one uniform $U$ shared by all strata, $u_j = (j - 1 + U)/N$;
+        each particle receives $\lfloor N w^{(i)} \rfloor$ or $\lceil N w^{(i)} \rceil$
+        copies;
+  \item \textbf{residual}: $\lfloor N w^{(i)} \rfloor$ copies deterministically, the remaining
+        $R = N - \sum_i \lfloor N w^{(i)} \rfloor$ by multinomial sampling on the residual
+        weights.
+\end{itemize}
+All four are implemented by inverting the cumulative weights at sorted pointers $u_j$.
+
+\paragraph{Roughening.} Resampling duplicates particles, and with small process noise the cloud
+can collapse to few distinct values (sample impoverishment). Roughening~\cite{gordon1993} adds
+independent jitter after each resampling, with per-component standard deviation
+$\sigma_j = K E_j N^{-1/d}$, where $E_j$ is the range of component $j$ over the particles, $d = 4$
+the state dimension and $K$ a tuning constant.
+
+\subsection{Extended Kalman filter baseline}\label{sec:ekf}
+The EKF approximates the posterior by a Gaussian $\N(\hat\x_k, P_k)$. Because the motion model
+\eqref{eq:motion} is linear its prediction is exact; only the measurement is linearised, at the
+predicted position, through the terrain slope:
+\begin{align}
+  \hat\x_k^- &= F\hat\x_{k-1} + G\uu_k, & P_k^- &= F P_{k-1} F\T + Q,\\
+  H_k &= \begin{bmatrix} \partial h/\partial p_x & \partial h/\partial p_y & 0 & 0\end{bmatrix}_{\hat\p_k^-},
+  & S_k &= H_k P_k^- H_k\T + \sigma_z^2,\\
+  K_k &= P_k^- H_k\T S_k^{-1}, & \hat\x_k &= \hat\x_k^- + K_k\,(z_k - h(\hat\p_k^-)),\\
+  P_k &= (I - K_k H_k) P_k^- (I - K_k H_k)\T + K_k \sigma_z^2 K_k\T. &&
+\end{align}
+The Joseph form of the covariance update keeps $P_k$ symmetric positive semi-definite. The
+slope comes from central differences of the DEM, bilinearly interpolated. The weakness is
+structural: $H_k$ describes the terrain over one 30\,m cell, while the position uncertainty may
+be hundreds of metres. Over that range the terrain is nothing like a plane, so the EKF explains a
+large innovation with the wrong local slope and can move confidently in the wrong direction.
+It also cannot represent several candidate positions at once.
+
+\subsection{Heavy-tailed likelihood for altimeter outliers}\label{sec:studentt}
+A radar altimeter occasionally returns a gross error (multipath, the edge of a cliff, a
+spurious return). Under the Gaussian likelihood a single 100\,m outlier multiplies the weight
+of every particle near the truth by about $e^{-386}$ (since $\tfrac12(100/3.6)^2 \approx 386$),
+wiping them out. Replacing the Gaussian
+by a Student-$t$ density with scale $\sigma_z$ and $\nu$ degrees of freedom,
+\begin{equation}
+  \log p(z \mid \x) = \log\Gamma\!\left(\tfrac{\nu+1}{2}\right) - \log\Gamma\!\left(\tfrac{\nu}{2}\right)
+  - \tfrac12 \log(\nu\pi\sigma_z^2)
+  - \tfrac{\nu+1}{2}\log\!\left(1 + \frac{(z - h(\p))^2}{\nu\sigma_z^2}\right),
+  \label{eq:studentt}
+\end{equation}
+makes the log-likelihood grow only logarithmically with the residual, so one outlier costs
+a few units instead of hundreds and the particles near the truth survive. For small residuals
+the core of \eqref{eq:studentt} is close to the Gaussian, so little accuracy is lost when there
+are no outliers. The constants are kept so that the log evidence of the two models can be
+compared; $\nu = 4$ is used.
+
+\subsection{Divergence monitor and recovery}\label{sec:monitor}
+A filter that has locked onto the wrong patch of terrain (``false lock'') is confidently
+wrong: its cloud is tight, yet the terrain under it does not match the measurements. This is
+detectable without ground truth through the normalised innovation squared (NIS) of the
+predictive distribution,
+\begin{equation}
+  \mathrm{NIS}_k = \frac{(z_k - \hat z_k)^2}{S_k},\quad
+  \hat z_k = \sum_i w_{k-1}^{(i)} h(\p_k^{(i)}),\quad
+  S_k = \sum_i w_{k-1}^{(i)} \bigl(h(\p_k^{(i)}) - \hat z_k\bigr)^2 + \sigma_z^2 .
+\end{equation}
+For a filter consistent with the data, $\mathrm{NIS}_k$ is approximately $\chi^2_1$, so the sum
+over a window of $L$ steps is approximately $\chi^2_L$; the monitor raises an alarm when the
+windowed mean exceeds $\chi^2_L(1 - p_{\mathrm{FA}})/L$. During acquisition the cloud is wide,
+$S_k$ is large and the NIS stays small, so the monitor is naturally quiet there. On an alarm the
+belief is replaced by the mixture
+\begin{equation}
+  (1-\alpha)\, p(\x_k \mid z_{1:k}) + \alpha\, p_{\mathrm{DR}}(\x_k),
+\end{equation}
+represented by $(1-\alpha)N$ particles resampled from the current cloud and $\alpha N$ particles
+drawn from the dead-reckoning belief $p_{\mathrm{DR}}$ --- the prior propagated through the
+motion model without any terrain update. Whatever the terrain did, $p_{\mathrm{DR}}$ still
+contains the true state at its stated confidence, so the re-spread particles give the filter a
+chance to find the correct mode again, while the kept particles preserve the current hypothesis
+in case the alarm was false.
+
+\subsection{Rao-Blackwellised (marginalised) particle filter}\label{sec:rbpf}
+The bias enters the model linearly and the measurement does not depend on it. Conditioned on a
+position history $\p_{0:k}$ the bias is therefore Gaussian, and Rao-Blackwellisation computes it
+exactly with a Kalman filter instead of sampling it~\cite{schon2005}: particles carry only the
+position, each with the Kalman mean $\hat\bias^{(i)}$ of its bias. The Kalman \emph{covariance}
+$P^b$ depends only on the model matrices, which are the same for every particle, so all
+particles share one covariance and one Riccati recursion. Marginalising the bias out of
+\eqref{eq:motion} gives the position proposal, and the sampled increment
+$\vect{\eta}^{(i)} = \p_k^{(i)} - \p_{k-1}^{(i)} - \Delta t\,\uu_k = -\Delta t\,\bias_{k-1} + \vect{w}_p$
+is a linear measurement of the bias:
+\begin{align}
+  \p_k^{(i)} &\sim \N\bigl(\p_{k-1}^{(i)} + \Delta t(\uu_k - \hat\bias^{(i)}),\; S\bigr),
+  & S &= \Delta t^2 P^b + \sigma_p^2 I_2,\\
+  L &= -\Delta t\, P^b S^{-1}, & \hat\bias^{(i)} &\leftarrow \hat\bias^{(i)} + L\bigl(\vect\eta^{(i)} + \Delta t\,\hat\bias^{(i)}\bigr),\\
+  P^b &\leftarrow P^b - L S L\T + \sigma_b^2 I_2, & w_k^{(i)} &\propto w_{k-1}^{(i)}\, p(z_k \mid \p_k^{(i)}).
+\end{align}
+The state covariance adds the shared $P^b$ to the spread of the bias means. Each particle now
+represents a whole Gaussian over the bias instead of one sample of it, which should need fewer
+particles for the same accuracy.
+
+\subsection{Posterior Cramér--Rao bound}\label{sec:pcrb}
+The posterior (Bayesian) Cramér--Rao bound gives a lower bound on the mean-square error of
+\emph{any} estimator, $\E[(\hat\x_k - \x_k)(\hat\x_k - \x_k)\T] \succeq J_k^{-1}$, where $J_k$
+is the Bayesian information matrix. Tichavsk\'y, Muravchik and Nehorai~\cite{tichavsky1998}
+derived a recursion for $J_k$; for linear dynamics with additive Gaussian noise and the
+measurement \eqref{eq:meas} it becomes
+\begin{equation}
+  J_k = \bigl(Q + F J_{k-1}^{-1} F\T\bigr)^{-1} + \E\!\left[H_k\T R^{-1} H_k\right],\qquad
+  J_0 = P_0^{-1},\qquad H_k = \begin{bmatrix} \nabla h(\p_k)\T & 0 & 0 \end{bmatrix},
+  \label{eq:pcrb}
+\end{equation}
+where the Jacobian is evaluated at the \emph{true} state and the expectation is over the
+distribution of the true state. The first term is the Kalman prediction of the information; the
+second is the information the altimeter adds, $\nabla h \nabla h\T / R$: steep terrain is
+informative, and only along the slope direction. Bergman applied this bound to terrain
+navigation~\cite{bergman1999thesis}. For a linear-Gaussian model \eqref{eq:pcrb} is exactly the
+Kalman filter covariance recursion; the implementation is tested against it.
+
+\paragraph{True noise.} The bound must use the noise of the simulated world, not the filters'
+tuned $Q$. From $\uu_k = \vect v_k + \bias_k + \vect n_k$ and
+$\bias_k = \bias_{k-1} + \Delta\bias_k$,
+$\p_k = \p_{k-1} + \Delta t(\uu_k - \bias_{k-1}) - \Delta t(\Delta\bias_k + \vect n_k)$, so the
+process noise $\vect w_k = [-\Delta t(\Delta\bias_k + \vect n_k);\ \Delta\bias_k]$ has, per axis,
+\begin{equation}
+  Q_{\mathrm{true}} = \begin{bmatrix} \Delta t^2 (q_b + q_n) & -\Delta t\, q_b \\
+                                      -\Delta t\, q_b & q_b \end{bmatrix}\otimes I_2,
+  \qquad q_b = \sigma_{\mathrm{rw}}^2 \Delta t,\; q_n = \sigma_n^2,
+\end{equation}
+and $R = \sigma_z^2$. A unit test checks $Q_{\mathrm{true}}$ against the empirical covariance of
+the simulator's noise.
+
+\paragraph{Which expectation.} Two versions are computed. (i) The \emph{ensemble bound}: the
+expectation in \eqref{eq:pcrb} is the average over the true trajectories of all Monte Carlo
+runs. Flights are placed uniformly at random, so given the initial guess the true start is
+distributed exactly as the filters' prior $\N(\hat\p_0, \sigma_0^2 I)$, and this bound applies to
+the ensemble RMSE the experiments report. (ii) The \emph{per-flight bound}: $H_k$ along one fixed
+flight path, compared with the tracking error of runs that fly that path. Because the bound only
+involves the slope at the true position, it ignores ambiguity --- other places with the same
+height profile. It describes a filter that already knows which hill it is over, so it should be
+tight in the tracking phase and loose during acquisition.
+
+\subsection{Terrain data}\label{sec:data}
+The terrain is the Copernicus GLO-30 digital elevation model~\cite{copernicus2022}, a
+1-arc-second (\(\approx 30\)\,m) global product, downloaded through the OpenTopography Global
+DEM API~\cite{opentopo} and reprojected with bilinear resampling to a 30\,m grid in UTM zone~44N
+(EPSG:32644), which covers all of Sri Lanka. The product handbook states an absolute vertical
+accuracy better than 4\,m and a relative vertical accuracy better than 2\,m (slopes up to
+20\,\%) or 4\,m (steeper slopes), both as 90\,\% linear errors~\cite{copernicus2022}. It is a
+\emph{surface} model: it includes buildings and vegetation, so over forest a radar altimeter
+that sees the ground (or part of the canopy) measures something different from the map. Study
+regions were chosen by measured terrain statistics with a rule fixed in advance
+(\cref{sec:regions}). The terrain statistics used throughout are:
+the elevation range and standard deviation; the slope $|\nabla h|$ in percent; the
+\emph{roughness}, the standard deviation of elevation inside a moving $1\times1$\,km window,
+averaged over the region; and the \emph{Fisher information density}
+$\E[|\nabla h|^2]/\sigma_z^2$, the average position information one altimeter measurement adds
+(\cref{eq:pcrb}).
+
+\subsection{Evaluation methodology}\label{sec:eval}
+\paragraph{Monte Carlo with common random numbers.} Every result is an average over $M$ Monte
+Carlo runs. Run $i$ draws its flight (random start, heading and weave phase), INS noise,
+altimeter noise, outliers, map error and initial-guess direction from separate named random
+streams seeded by $i$, with fixed-size draws. Every filter and every configuration therefore
+sees exactly the same flights and noise: differences between estimators are paired, and a
+parameter change alters nothing but what it scales.
+
+\paragraph{Metrics.} A run has \emph{converged} if its position error stays below 50\,m
+throughout at least the final 100\,s; it is a \emph{false lock} if the final error exceeds
+200\,m while the filter's own $2\sigma$ position radius $2\sqrt{\lambda_{\max}(P_{\mathrm{pos}})}$
+is below 50\,m (confidently wrong). A run can be neither: a late acquisition or a temporary
+excursion while crossing flat ground counts as ``not converged'' even if the final error is
+small. The \emph{tracking RMSE} is computed over the final 100\,s of converged runs only, which
+separates tracking accuracy from acquisition. Consistency is measured by the position NEES
+$\epsilon_k = \tilde\p_k\T P_{\mathrm{pos},k}^{-1}\tilde\p_k$ and its average over runs (ANEES),
+which for a consistent filter lies in
+$[\chi^2_{2M}(0.025)/M,\ \chi^2_{2M}(0.975)/M]$~\cite{barshalom2001}.
+
+\paragraph{Uncertainty and tests.} Rates carry Wilson score 95\,\% intervals~\cite{wilson1927};
+RMSE values carry percentile-bootstrap 95\,\% intervals over runs~\cite{efron1993}. Because the
+runs are paired, two filters' convergence is compared with McNemar's exact
+test~\cite{mcnemar1947}, which uses only the runs where exactly one of them converged. All
+parameters of the analysis (selection rules, definitions, which regions each experiment uses)
+were fixed and recorded before the corresponding experiment ran.

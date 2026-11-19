@@ -1,0 +1,100 @@
+% Terrain-Aided Navigation of a GPS-Denied UAV with a Particle Filter
+% Build: latexmk -pdf -jobname=220059J_mini_project_report main.tex   (or upload report/ to Overleaf)
+% Numbers come from ../generated/*.tex, tables from ../tables/, figures from ../figures/ —
+% all written by the scripts in the repository; nothing here is typed by hand.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=25mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{hyperref}
+\usepackage[nameinlink,capitalise]{cleveref}
+\usepackage{textcomp}
+\usepackage{newunicodechar}
+
+\graphicspath{{../figures/}}
+\captionsetup{font=small,labelfont=bf}
+\hypersetup{colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue!50!black}
+
+% Unicode used in generated tables/captions
+\newunicodechar{σ}{\ensuremath{\sigma}}
+\newunicodechar{₀}{\ensuremath{_0}}
+\newunicodechar{×}{\ensuremath{\times}}
+\newunicodechar{≤}{\ensuremath{\le}}
+
+% generated numbers
+\IfFileExists{../generated/terrain.tex}{\input{../generated/terrain.tex}}{}
+\IfFileExists{../generated/runtime.tex}{\input{../generated/runtime.tex}}{}
+\IfFileExists{../generated/e1.tex}{\input{../generated/e1.tex}}{}
+\IfFileExists{../generated/e2.tex}{\input{../generated/e2.tex}}{}
+\IfFileExists{../generated/e3.tex}{\input{../generated/e3.tex}}{}
+\IfFileExists{../generated/e4.tex}{\input{../generated/e4.tex}}{}
+\IfFileExists{../generated/e5.tex}{\input{../generated/e5.tex}}{}
+\IfFileExists{../generated/e6.tex}{\input{../generated/e6.tex}}{}
+\IfFileExists{../generated/e7.tex}{\input{../generated/e7.tex}}{}
+\IfFileExists{../generated/data.tex}{\input{../generated/data.tex}}{}
+
+% notation
+\newcommand{\vect}[1]{\bm{#1}}
+\newcommand{\x}{\vect{x}}
+\newcommand{\p}{\vect{p}}
+\newcommand{\bias}{\vect{b}}
+\newcommand{\uu}{\vect{u}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\T}{^{\mathsf{T}}}
+\newcommand{\Neff}{N_{\mathrm{eff}}}
+
+\lstset{basicstyle=\ttfamily\footnotesize,breaklines=true,frame=single,columns=fullflexible,
+  keywordstyle=\bfseries,commentstyle=\itshape\color{black!60},language=Python,
+  numbers=left,numberstyle=\tiny\color{black!50},xleftmargin=1.5em}
+
+\begin{document}
+
+\begin{titlepage}
+  \centering
+  \vspace*{30mm}
+  {\LARGE\bfseries Terrain-Aided Navigation of a GPS-Denied UAV\\ with a Particle Filter\par}
+  \vspace{15mm}
+  {\large G.A.M.I.K. Bandara (220059J)\par}
+  \vspace{5mm}
+  {\large EN4594 Autonomous Systems --- Mini Project\par}
+  \vspace{5mm}
+  {\large University of Moratuwa\par}
+  \vfill
+  {\large \today\par}
+\end{titlepage}
+
+\begin{abstract}
+\input{sections/abstract}
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\input{sections/introduction}
+\input{sections/methodology}
+\input{sections/implementation}
+\input{sections/results}
+\input{sections/discussion}
+\input{sections/conclusion}
+
+\bibliographystyle{unsrtnat}
+\bibliography{references}
+
+\appendix
+\input{sections/appendix}
+
+\end{document}

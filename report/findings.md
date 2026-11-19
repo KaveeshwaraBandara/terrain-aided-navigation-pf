@@ -18,6 +18,34 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — Reference check (A9)
+
+Checked against DOI registration records (Crossref), publisher/author pages and the PDFs:
+- Verified details now in `report/latex/references.bib`: Bergman, Ljung & Gustafsson, IEEE CSM
+  19(3):33–40, 1999; Hostetler & Andreas, IEEE TAC 28(3):315–323, 1983 (middle initials not
+  verifiable → initials only as on the DOI record); Tichavský et al., IEEE TSP 46(5):1386–1396,
+  1998; Hol et al., NSSPW 2006, Cambridge UK, pp. 79–82; Bergman thesis = Linköping
+  Dissertations No. 579; Wilson 1927 JASA 22(158):209–212; McNemar 1947 Psychometrika
+  12(2):153–157; Bar-Shalom et al. 2001 (Wiley) — NEES cited by chapter (5) only, the exact
+  section was not verifiable; Efron & Tibshirani — DOI record says 1993, the publisher page says
+  "Copyright 1994"; cited as 1993 with the DOI.
+- **Hol et al. (2006)** recommend systematic resampling ("favourable, both in terms of
+  resampling quality and computational complexity"); lower variance than multinomial is argued
+  for stratified and residual; for systematic they note a variance analysis is hard and cite an
+  artificial example with increased variance; RMSE effects in their simulations "are not
+  significant". E3 is compared against exactly these statements.
+- **Gordon et al. (1993), §4.2**: roughening σ = K·E·N^(−1/d), E the range of the samples of
+  that component, d the state dimension; K = 0.2 in their bearings-only example (N = 4000).
+- **Bergman (1999)**: Ch. 4 "Cramér-Rao Bounds" (4.4 Posterior Bounds), §7.2 "Cramér-Rao
+  Bound Evaluation" for terrain navigation.
+- **Copernicus DEM handbook v5.0 (29 Nov 2022)**, Table 1: absolute vertical accuracy < 4 m,
+  relative < 2 m (slope ≤ 20 %) / < 4 m (slope > 20 %), 90 % linear errors; a DSM including
+  buildings, infrastructure and vegetation; water bodies flattened in the edited WorldDEM.
+  Not stated in the handbook: that the ocean is set to 0 m — the no-data/sea check in
+  `tan.data` treating ≤ 0 m as sea is a heuristic, not a documented property.
+
+---
+
 ## 2026-11-19 — Experiment design decisions, fixed before any real-terrain run
 
 - **Definitions** (A5): converged = error < 50 m throughout at least the final 100 s;

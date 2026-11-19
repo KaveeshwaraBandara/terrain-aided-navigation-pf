@@ -177,9 +177,12 @@ def make(exp: str = "visuals", quick: bool = False) -> None:
         ax.set_xlabel("Easting (km, UTM 44N)")
         ax.set_ylabel("Northing (km, UTM 44N)")
         ax.legend(loc="upper left", frameon=True, framealpha=0.9)
-        k_end = int(min(sim.n_steps, max(60, info["convergence_time_s"] + 20)))
-        zoom = np.vstack([tr[: k_end + 1], pf.est[:k_end, :2] / 1e3])
-        z0, z1 = zoom.min(0) - 0.3, zoom.max(0) + 0.3
+        # zoom on where the PF locks on: the true track from 20 s before to 20 s after the
+        # convergence time (estimates far from the truth simply enter from outside the box)
+        kc = int(info["convergence_time_s"] / sim.dt)
+        zoom = tr[max(0, kc - 20) : min(len(tr), kc + 20)]
+        c, half = zoom.mean(0), max(0.4, 0.6 * float(np.ptp(zoom, axis=0).max()))
+        z0, z1 = c - half, c + half
         ins = ax.inset_axes([0.62, 0.02, 0.36, 0.36])
         ins.imshow(shade, cmap="gray", extent=ext, origin="upper", vmin=0, vmax=1, alpha=0.9)
         draw(ins, lw=1.2)

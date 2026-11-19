@@ -28,6 +28,16 @@ SIGMA = "init.position_sigma"
 HOLD = 100.0
 
 
+def sci(x: float) -> str:
+    """Large ANEES values (false locks) in scientific notation for the table."""
+    if not np.isfinite(x):
+        return "--"
+    if abs(x) < 1e4:
+        return fmt(x, 1)
+    e = int(np.floor(np.log10(abs(x))))
+    return f"${x / 10**e:.1f}\\times10^{{{e}}}$"
+
+
 def resolved_cfg(exp: str, quick: bool, study: str, config: str) -> dict:
     path = results_dir(exp, quick) / "meta" / "resolved_configs.yaml"
     return yaml.safe_load(path.read_text())[f"{study}/{config}"]
@@ -87,6 +97,11 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                 nees = nees_pos(data[f"{f}__est"], data[f"{f}__cov"], truth)
                 conv = summ[summ["filter"] == f].set_index("run").loc[data["_run"], "converged"]
                 conv = conv.to_numpy()
+                ens[(region, s, f, "conv")] = (
+                    np.sqrt(np.mean(err[conv] ** 2, axis=0))
+                    if conv.any()
+                    else np.full(len(t), np.nan)
+                )
                 cons[(region, s, f, "all")] = nees.mean(axis=0)
                 cons[(region, s, f, "conv")] = (
                     nees[conv].mean(axis=0) if conv.any() else np.full(len(t), np.nan)
@@ -96,14 +111,17 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                 )
                 an_all = float(np.mean(nees[:, win]))
                 an_conv = float(np.mean(nees[conv][:, win])) if conv.any() else np.nan
-                ratio = float(np.mean(ens[(region, s, f)][win] / ens[(region, s, "bound")][win]))
+                # tracking phase of converged runs: how close does the filter get to the bound?
+                ratio = float(
+                    np.mean(ens[(region, s, f, "conv")][win] / ens[(region, s, "bound")][win])
+                )
                 lo_c, hi_c = anees_bounds(int(conv.sum())) if conv.any() else (np.nan, np.nan)
                 trows.append(
                     [
                         REGION_LABELS.get(region, region),
                         f"{s:g}",
                         style_of(f)["label"],
-                        fmt(an_all, 1),
+                        sci(an_all),
                         fmt(an_conv, 2),
                         f"[{fmt(lo_c, 2)}, {fmt(hi_c, 2)}]",
                         f"{fmt(100 * inside, 0)}",
@@ -131,7 +149,7 @@ def make(exp: str = "e5", quick: bool = False) -> None:
             "ANEES conv.",
             "95\\% interval",
             "In $\\chi^2_2$ bounds (\\%)",
-            "RMSE / PCRB",
+            "RMSE$_{\\mathrm{conv}}$ / PCRB",
         ],
         trows,
         align="lllrrrrr",
@@ -166,7 +184,16 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                         ens[(region, s, f)],
                         color=st["color"],
                         ls=st["ls"],
-                        label=f"{st['label']} RMSE",
+                        label=f"{st['label']}, all runs",
+                    )
+                    ax.plot(
+                        t,
+                        ens[(region, s, f, "conv")],
+                        color=st["color"],
+                        ls=st["ls"],
+                        lw=0.8,
+                        alpha=0.7,
+                        label=f"{st['label']}, converged runs",
                     )
                 ax.plot(
                     t, ens[(region, s, "bound")], color=INK, ls=(0, (6, 2)), lw=1.2, label="PCRB"
@@ -179,13 +206,13 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                 if i == len(show) - 1:
                     ax.set_xlabel("Time (s)")
         handles, labels = axes[0, 0].get_legend_handles_labels()
-        fig.legend(handles, labels, loc="outside lower center", ncol=len(labels))
+        fig.legend(handles, labels, loc="outside lower center", ncol=4)
         save_report(fig, out.figure("bound"))
 
     s = show[0]
     with report_style():
         fig = Figure(figsize=(TEXT_WIDTH_IN, 4.0), layout="constrained")
-        axes = fig.subplots(2, len(regions), sharex=True, sharey=True, squeeze=False)
+        axes = fig.subplots(2, len(regions), sharex=True, sharey="row", squeeze=False)
         for j, region in enumerate(regions):
             t = ens[(region, s, "t")]
             for i, which in enumerate(["all", "conv"]):
@@ -215,6 +242,7 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                     ax.set_xlabel("Time (s)")
         handles, labels = axes[0, 0].get_legend_handles_labels()
         fig.legend(handles, labels, loc="outside lower center", ncol=len(labels))
+        axes[1, 0].set_ylim(0.3, 300)
         save_report(fig, out.figure("anees"))
     macros["EFiveAneesSigma"] = f"{s:g}"
 
