@@ -85,7 +85,8 @@ def make(exp: str = "e1", quick: bool = False) -> None:
                     ax.set_xlabel("Initial position std σ₀ (m)")
             axes[0, 0].set_ylabel("Converged runs (%)")
             axes[1, 0].set_ylabel("False-lock runs (%)")
-        axes[0, -1].legend(loc="lower left")
+        handles, labels = axes[0, 0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc="outside lower center", ncol=len(labels))
         save_report(fig, out.figure("rates"))
 
     # ------------------------------------------------------------------ error vs time

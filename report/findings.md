@@ -18,6 +18,63 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — E2: terrain informativeness (200 random flights per region, σ₀ = 500 m)
+
+Setup: `configs/experiments/e2.yaml`; EKF and PF (N = 5 000); same flights for both.
+- Convergence: PF 96 / 94 / 60 % (hill / Kandy / plains), EKF 26 / 26 / 12 %.
+- **Per-flight terrain vs error (RMS error over the final 100 s, pooled over regions):**
+  PF Spearman ρ = −0.63 [−0.69, −0.57] (rougher terrain under the flight → smaller error);
+  **EKF ρ = +0.29 [0.21, 0.37] — the opposite sign**: on rougher terrain the EKF does *worse*.
+  The same terrain texture that informs the PF breaks the EKF's local linearisation.
+- Within a region the correlations are weak (PF ρ −0.16 / −0.26 / −0.05): most of the effect is
+  between terrain types, not between flights of one region.
+- Convergence rises with the terrain information collected along the flight (binned, both
+  filters) — the PF from ≈ 50 % in the least informative bin to ≈ 95–99 % over the hills.
+- **Along- vs cross-track:** no systematic anisotropy on average. Tracking RMS along/cross =
+  6.0/6.0 m (hill), 7.4/7.5 m (Kandy), 14.7/15.4 m (plains) for the PF; the median ratio of
+  along- to cross-track terrain information is ≈ 1 (0.98–1.05). The hypothesis that errors are
+  systematically elongated along ridges/valleys is **not supported** at this level: the 25°
+  heading weave and the varied ridge directions in 40 km boxes mix the two directions.
+- On the plains the PF's "non-converged" runs sit mostly just above the 50 m threshold
+  (RMS 50–100 m), i.e. imprecise, not lost.
+
+## 2026-11-19 — E1: filters vs initial uncertainty on real terrain (M = 300 per cell)
+
+Setup: `configs/experiments/e1.yaml`; 3 regions × σ₀ ∈ {100, 250, 500, 1000, 1500, 2000} m ×
+300 random flights; DR, EKF, PF 5 000, PF 20 000 on identical flights. 27 min on 10 workers.
+Converged (Wilson 95 % CI) / false lock, hill country:
+
+| σ₀ (m) | EKF | PF 5 000 | PF 20 000 |
+|---|---|---|---|
+| 100 | 85 [81, 89] / 15 | 100 / 0 | 100 / 0 |
+| 500 | 28 [23, 33] / 70 | 95 [92, 97] / 3 | 98 [95, 99] / 1 |
+| 1000 | 14 / 84 | 72 [66, 76] / 25 | 92 [89, 95] / 6 |
+| 2000 | 6 / 93 | 40 [35, 46] / 54 | 70 [64, 75] / 29 |
+
+Kandy is almost identical to the hill country; on the plains the PF converges in only 67–46 %
+(PF 20 000, σ₀ 100 → 2000 m) but **almost never false-locks (≤ 1 %)** — it stays honestly
+uncertain — while the EKF false-locks in 42 % of runs at σ₀ = 500 m.
+
+Interpretation:
+- **The hypothesis from the synthetic terrain is confirmed, strongly.** On the smooth synthetic map
+  the EKF held up to σ₀ = 1 km; on the real 30 m DEM it already fails in 15 % of runs at
+  σ₀ = 100 m and 70 % at 500 m. Real terrain has slope variation at the scale of a few cells,
+  so the one-cell Jacobian is wrong as soon as the error exceeds a few tens of metres.
+- **The EKF is worse than no terrain at all.** Its median error grows during the flight and ends
+  well above dead reckoning on both hilly regions: wrong slope-based corrections also corrupt its
+  bias estimate, so it drifts faster than the uncorrected INS.
+- **The PF's failure mode at large σ₀ is false lock**, not slow convergence (PF 5 000 at 2 km:
+  54 % false lock). More particles help significantly from σ₀ ≥ 500 m (McNemar p < 0.05 on every
+  region; p < 10⁻¹⁴ at ≥ 1 km on the hilly regions). This motivates E6.
+- Tracking RMSE (converged runs) ≈ 6.5–9 m (hill), 7.4–10.6 m (Kandy), ≈ 21–23 m (plains),
+  growing mildly with σ₀ (late convergers).
+- PF vs EKF convergence: McNemar p < 10⁻¹⁰ in all 18 cells.
+- Radar ranges from the corridor altitude: median of the per-flight maximum 1 051 / 872 / 337 m,
+  largest 1 738 m (hill). The constant 3 m radar noise is an assumption that is optimistic at
+  1–1.7 km range.
+
+---
+
 ## 2026-11-19 — M2 complete: `make quick` runs end to end on the real regions
 
 - All seven experiments run in `--quick` mode (3 runs, 150 s flights) and every analysis writes

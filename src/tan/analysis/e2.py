@@ -20,6 +20,7 @@ from .common import (
     rate,
     regions_in,
     series,
+    yerr,
 )
 
 FILTERS = ["ekf", "pf_5000"]
@@ -102,15 +103,7 @@ def make(exp: str = "e2", quick: bool = False) -> None:
                     label=f"{REGION_LABELS.get(region, region)}, not converged",
                 )
             rho, lo, hi = spearman_ci(g["terrain_roughness_1km_m"], g["window_rms_m"], rng)
-            ax.text(
-                0.98,
-                0.97,
-                f"Spearman ρ = {rho:.2f} [{lo:.2f}, {hi:.2f}]",
-                transform=ax.transAxes,
-                ha="right",
-                va="top",
-                fontsize=8,
-            )
+            ax.set_title(f"{st['label']}: Spearman ρ = {rho:.2f} [{lo:.2f}, {hi:.2f}]")
             macros[macro_name("e2 rho", f)] = fmt(rho, 2)
             macros[macro_name("e2 rho", f, "lo")] = fmt(lo, 2)
             macros[macro_name("e2 rho", f, "hi")] = fmt(hi, 2)
@@ -118,9 +111,32 @@ def make(exp: str = "e2", quick: bool = False) -> None:
             ax.set_xscale("log")
             ax.set_yscale("log")
             ax.set_xlabel("Terrain roughness under the flight (m)")
-            ax.set_title(st["label"])
         axes[0].set_ylabel("RMS error, final 100 s (m)")
-        axes[-1].legend(loc="lower left", fontsize=6.5, ncol=1, markerscale=1.4)
+        # neutral legend: marker shape = region; filled = converged, hollow = not converged
+        from matplotlib.lines import Line2D
+
+        from ..plotting import MUTED
+
+        handles = [
+            Line2D(
+                [],
+                [],
+                ls="none",
+                marker=MARKERS.get(r, "o"),
+                color=MUTED,
+                ms=4,
+                label=REGION_LABELS.get(r, r),
+            )
+            for r in regions
+        ]
+        handles += [
+            Line2D([], [], ls="none", marker="o", color=MUTED, ms=4, label="converged"),
+            Line2D(
+                [], [], ls="none", marker="o", mfc="none", color=MUTED, ms=4, label="not converged"
+            ),
+            Line2D([], [], color="#8a8984", lw=0.8, ls=":", label="50 m threshold"),
+        ]
+        fig.legend(handles=handles, loc="outside lower center", ncol=len(handles))
         save_report(fig, out.figure("scatter"))
 
     # ------------------------------------------------------------ binned by information
@@ -141,11 +157,23 @@ def make(exp: str = "e2", quick: bool = False) -> None:
                 y.append(100 * r["rate"])
                 lo.append(100 * r["lo"])
                 hi.append(100 * r["hi"])
-            ax.fill_between(xs, lo, hi, color=st["color"], alpha=0.15, lw=0)
-            ax.plot(xs, y, color=st["color"], ls=st["ls"], marker="o", ms=3, label=st["label"])
+            # markers only: the bins are pooled over regions and leave a gap (no flight has
+            # information between the plains and the hills), so a line would interpolate
+            ax.errorbar(
+                xs,
+                y,
+                yerr=yerr(y, lo, hi),
+                fmt="o",
+                ms=4,
+                capsize=2,
+                color=st["color"],
+                label=st["label"],
+            )
         ax.set_xscale("log")
         ax.set_ylim(-3, 103)
-        ax.set_xlabel("Terrain information along the flight, Σ|∇h|²/σ_z² (m⁻²)")
+        ax.set_xlabel(
+            r"Terrain information along the flight, $\sum_k |\nabla h|^2/\sigma_z^2$ (m$^{-2}$)"
+        )
         ax.set_ylabel("Converged runs (%)")
         ax.legend(loc="lower right")
         save_report(fig, out.figure("binned"))
