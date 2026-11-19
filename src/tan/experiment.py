@@ -73,6 +73,7 @@ def run_filter(f: Estimator, sim: SimResult) -> FilterRun:
             "log_evidence": np.array(f.history["log_evidence"]),
             "nis": np.array(f.history["nis"]),
             "alarms": np.array(f.history["alarms"], dtype=bool),
+            **({"height_bias": np.array(f.history["height_bias"])} if f.hb_on else {}),
             "snapshots": f.snapshots,
             "n_particles": f.n,
         }

@@ -49,6 +49,8 @@ class ParticleFilter(Estimator):
         likelihood: str = "gaussian",
         nu: float = 4.0,
         monitor: dict | None = None,
+        height_bias_sigma0: float = 0.0,
+        height_bias_rw: float = 0.01,
         rng: np.random.Generator | None = None,
     ) -> None:
         if resampling not in RESAMPLERS:
@@ -67,6 +69,11 @@ class ParticleFilter(Estimator):
         self.snapshot_every = int(snapshot_every)
         self.likelihood = likelihood
         self.nu = float(nu)
+        # optional 5th state: constant offset c between the measured and the mapped height
+        # (barometer bias, canopy / DSM offset), z = h(p) + c + v  — Experiment 4 extension
+        self.hb_sigma0 = float(height_bias_sigma0)
+        self.hb_rw = float(height_bias_rw)
+        self.hb_on = self.hb_sigma0 > 0
         self.rng = rng if rng is not None else np.random.default_rng()
 
         # divergence monitor (Experiment 6), off by default
@@ -87,6 +94,9 @@ class ParticleFilter(Estimator):
     # ------------------------------------------------------------------ provided
     def initialize(self, mean: np.ndarray, cov: np.ndarray) -> None:
         self.particles = self.rng.multivariate_normal(mean, cov, size=self.n)
+        if self.hb_on:
+            c = self.rng.normal(0.0, self.hb_sigma0, size=(self.n, 1))
+            self.particles = np.hstack([self.particles, c])
         self._reset_bookkeeping(mean, cov)
 
     def _reset_bookkeeping(self, mean: np.ndarray, cov: np.ndarray) -> None:
@@ -101,7 +111,14 @@ class ParticleFilter(Estimator):
 
     @staticmethod
     def _empty_history() -> dict[str, list]:
-        return {"ess": [], "resampled": [], "log_evidence": [], "nis": [], "alarms": []}
+        return {
+            "ess": [],
+            "resampled": [],
+            "log_evidence": [],
+            "nis": [],
+            "alarms": [],
+            "height_bias": [],
+        }
 
     @property
     def weights(self) -> np.ndarray:
@@ -134,6 +151,8 @@ class ParticleFilter(Estimator):
         self.history["log_evidence"].append(self._last_log_evidence)
         self.history["nis"].append(self._last_nis)
         self.history["alarms"].append(bool(alarm))
+        if self.hb_on:
+            self.history["height_bias"].append(float(self.weights @ self.particles[:, 4]))
         if self.snapshot_every and self._k % self.snapshot_every == 0:
             self.snapshots.append((self._k, self.particles[:, :2].copy()))
         return self.estimate()
@@ -148,11 +167,13 @@ class ParticleFilter(Estimator):
         is how the filter estimates the bias without measuring it directly.
         """
         n = self.n
-        bias = self.particles[:, 2:]  # b_{k-1}, read before the bias is perturbed below
+        bias = self.particles[:, 2:4]  # b_{k-1}, read before the bias is perturbed below
         self.particles[:, :2] += dt * (np.asarray(u, dtype=float) - bias) + self.rng.normal(
             0.0, self.sigma_pos, size=(n, 2)
         )
-        self.particles[:, 2:] += self.rng.normal(0.0, self.sigma_bias, size=(n, 2))
+        self.particles[:, 2:4] += self.rng.normal(0.0, self.sigma_bias, size=(n, 2))
+        if self.hb_on:
+            self.particles[:, 4] += self.rng.normal(0.0, self.hb_rw, size=n)
 
     def log_likelihood(self, residual: np.ndarray) -> np.ndarray:
         """log p(z | x_i) as a function of the residual z − h(p_i), with its constant.
@@ -194,6 +215,8 @@ class ParticleFilter(Estimator):
         z = float(z)
         px, py = self.particles[:, 0], self.particles[:, 1]
         h = self.dem.height(px, py)
+        if self.hb_on:
+            h = h + self.particles[:, 4]  # predicted measurement includes the offset state
         loglik = self.log_likelihood(z - h)
 
         w_prev = self.weights
@@ -217,8 +240,9 @@ class ParticleFilter(Estimator):
         That is expected behaviour, not a bug, and is worth showing in the report.
         """
         w = self.weights
-        mean = w @ self.particles
-        d = self.particles - mean
+        x = self.particles[:, :4]
+        mean = w @ x
+        d = x - mean
         cov = (d * w[:, None]).T @ d
         return mean, cov
 
@@ -260,6 +284,8 @@ class ParticleFilter(Estimator):
         keep = self.n - n_new
         kept = self.particles[systematic_m(self.weights, keep, self.rng)]
         fresh = self.rng.multivariate_normal(self._dr_mean, self._dr_cov, size=n_new)
+        if self.hb_on:
+            fresh = np.hstack([fresh, self.rng.normal(0.0, self.hb_sigma0, size=(n_new, 1))])
         self.particles = np.vstack([kept, fresh])
         self.log_weights = np.full(self.n, -np.log(self.n))
 

@@ -37,6 +37,8 @@ class RaoBlackwellizedPF(ParticleFilter):
     def __init__(self, *args, **kwargs) -> None:
         kwargs.pop("roughening", None)  # not used: positions are re-sampled every step
         super().__init__(*args, roughening=0.0, **kwargs)
+        if self.hb_on or self.monitor_on:
+            raise ValueError("RBPF supports neither the height-bias state nor the monitor")
         self.P_bias = np.eye(2)
 
     def initialize(self, mean: np.ndarray, cov: np.ndarray) -> None:

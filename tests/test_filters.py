@@ -181,3 +181,18 @@ def test_monitor_recovers_from_forced_false_lock(cfg, synthetic_dem, rng):
     err = np.linalg.norm(np.array(est)[:, :2] - sim.truth, axis=1)
     assert any(pf.history["alarms"])
     assert err[-30:].mean() < 60.0
+
+
+def test_height_bias_state_absorbs_a_constant_offset(cfg, synthetic_dem, rng):
+    """A7: with a 20 m constant measurement offset, the filter with an offset state
+    estimates the offset and tracks; the estimate is returned as a 4-D state."""
+    sim = _sim(cfg, synthetic_dem, rng, position_sigma=200.0)
+    sim.z = sim.z + 20.0
+    c = deep_update(
+        cfg,
+        {"particle_filter": {"n_particles": 4000, "snapshot_every": 0, "height_bias_sigma0": 30.0}},
+    )
+    run = run_filter(make_filter("particle_filter", c, synthetic_dem, rng), sim)
+    assert run.est.shape == (sim.n_steps, 4)
+    assert abs(run.extras["height_bias"][-50:].mean() - 20.0) < 3.0
+    assert run.error[-50:].mean() < 40.0

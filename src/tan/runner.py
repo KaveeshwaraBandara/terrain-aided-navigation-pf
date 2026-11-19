@@ -198,6 +198,10 @@ def _summary_row(name, family, run, sim, est, cov, err, threshold, hold) -> dict
         "final_error_cross_m": float(e_cross[-1]),
         "final_2sigma_radius_m": float(two_sigma_radius(final_cov)),
         "mean_nees_tracking": float(np.mean(nees[win])),
+        "final_bias_error_mps": float(np.linalg.norm(est[-1, 2:] - sim.bias[-1])),
+        "tracking_bias_rmse_mps": float(
+            np.sqrt(np.mean(np.sum((est[win, 2:] - sim.bias[win]) ** 2, 1)))
+        ),
     }
 
 
@@ -238,7 +242,7 @@ def run_task(conf: Configuration, run: int, out: Path) -> float:
         arrays[f"{k}__est"] = fr.est.astype(np.float32)
         arrays[f"{k}__cov"] = fr.cov[:, _UPPER[0], _UPPER[1]].astype(np.float32)
         arrays[f"{k}__err"] = fr.error.astype(np.float32)
-        for name in ("ess", "resampled", "log_evidence", "nis", "alarms"):
+        for name in ("ess", "resampled", "log_evidence", "nis", "alarms", "height_bias"):
             if name in fr.extras:
                 arrays[f"{k}__{name}"] = np.asarray(fr.extras[name])
         row = _summary_row(k, v.family, run, sim, fr.est, fr.cov, fr.error, threshold, hold)
