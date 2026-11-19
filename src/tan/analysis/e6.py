@@ -3,8 +3,10 @@
 Study ``dev`` (development seeds) chooses the monitor parameters with a rule fixed in
 advance (report/findings.md): the highest pooled convergence rate at σ₀ = 2000 m among
 the settings whose false-alarm rate at σ₀ = 250 m is at most 5 % (a false alarm = a run
-with at least one alarm); ties go to the longer window. Study ``test`` (main seeds)
-evaluates that choice.
+with at least one alarm); ties go to the longer window. If no setting meets the constraint
+(which happened), the setting with the lowest false-alarm rate is taken (extension recorded in
+report/findings.md before the test runs). Study ``test`` (main seeds) evaluates that choice,
+together with roughening (K = 0.05, from E3) and the combination.
 """
 
 from __future__ import annotations
@@ -55,8 +57,14 @@ def choose(dev) -> tuple[dict, list]:
             }
         )
     ok = [r for r in rows if r["false_alarm_low"]["rate"] <= MAX_FALSE_ALARM]
-    pool = ok or rows
-    best = max(pool, key=lambda r: (r["conv_high"]["rate"], r["window"]))
+    if ok:  # the pre-registered rule
+        best = max(ok, key=lambda r: (r["conv_high"]["rate"], r["window"]))
+    else:
+        # The pre-registered rule did not cover "no setting meets the constraint". Extension
+        # fixed on the dev data before any test run (report/findings.md): keep the rule's
+        # intent — control the alarm frequency — and take the lowest false-alarm rate; ties
+        # go to the higher convergence rate.
+        best = min(rows, key=lambda r: (r["false_alarm_low"]["rate"], -r["conv_high"]["rate"]))
     return best, rows
 
 

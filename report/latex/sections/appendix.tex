@@ -90,3 +90,33 @@ OpenTopography.
   \caption{E4, INS grade (initial bias std).}\label{tab:e4ins}
   \input{../tables/e4_summary_ins_grade.tex}
 \end{table}
+
+\section{Mismatched-gain Kalman analysis}\label{app:mismatch}
+To separate the effect of the filters' tuning from that of the particle approximation, consider a
+Kalman filter that uses the true terrain slopes $H_k$ along a flight but computes its gains with
+the filters' assumed noise $(Q_f, R_f)$, while the world has $(Q_t, R_t)$. The filter's own
+covariance $P_k$ and its actual error covariance $A_k$ evolve as
+\begin{align}
+  P_k^- &= F P_{k-1} F\trans + Q_f, & K_k &= P_k^- H_k\trans (H_k P_k^- H_k\trans + R_f)^{-1},
+  & P_k &= (I - K_k H_k) P_k^-,\\
+  A_k^- &= F A_{k-1} F\trans + Q_t, &&& A_k &= (I - K_k H_k) A_k^- (I - K_k H_k)\trans + K_k R_t K_k\trans .
+\end{align}
+With $(Q_f, R_f) = (Q_t, R_t)$, $A_k$ is the Kalman (and PCRB) covariance; a unit test checks
+this. $\sqrt{\operatorname{tr} A_{k,\mathrm{pos}}}$ is the tracking error that the tuning permits
+in the small-error regime (\texttt{tan.pcrb.mismatched\_kf\_error}).
+
+\begin{table}[H]
+  \centering\scriptsize
+  \caption{E5: consistency in the tracking window (ANEES over all and over converged runs, share
+    of single-run NEES inside the $\chi^2_2$ 95\,\% interval) and RMSE relative to the ensemble
+    PCRB (all runs: a valid comparison; converged runs: conditional).}\label{tab:e5cons}
+  \resizebox{\textwidth}{!}{\input{../tables/e5_consistency.tex}}
+\end{table}
+
+\begin{table}[H]
+  \centering\scriptsize
+  \caption{E5: per flight plan ($M = 100$, $\sigma_0 = 500$\,m): PCRB, tracking RMSE a Kalman
+    filter with the PF's tuning would achieve, and the filters' tracking RMSE (converged
+    runs).}\label{tab:e5plans}
+  \resizebox{\textwidth}{!}{\input{../tables/e5_plans.tex}}
+\end{table}

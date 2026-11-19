@@ -18,6 +18,34 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — E6 dev study (seed root 1000, M = 100 per cell): monitor parameters chosen
+
+| window L | p_FA | converged at 2 km (pooled) | false alarms at 250 m (pooled) |
+|---|---|---|---|
+| 5 | 0.001 | 66 [60, 71] % | 19 [15, 23] % |
+| 5 | 0.01 | 46 % | 63 % |
+| 10 | 0.001 | 65 % | 12 % |
+| 10 | 0.01 | 57 % | 43 % |
+| 20 | 0.001 | 63 [57, 68] % | 8 [5, 11] % |
+| 20 | 0.01 | 57 % | 29 % |
+| no monitor | — | 39 [34, 45] % | — |
+
+- **No setting met the pre-registered constraint** (false alarms ≤ 5 %). The rule did not say what
+  to do then, and the code's silent fallback (highest convergence → L = 5, 19 % false alarms)
+  was not pre-registered. **Decision, made on dev data only and before any test run:** keep the
+  constraint's intent and take the lowest false-alarm rate → **L = 20, p_FA = 0.001** (8 %
+  false alarms; 63 % vs the best 66 % convergence at 2 km, overlapping intervals).
+- The monitor works on the dev seeds: convergence at σ₀ = 2 km rises from 39 % to 63–66 %.
+- False alarms are nearly harmless: at σ₀ = 250 m with L ≥ 10, p = 0.001 the monitored PF
+  converges in 97–99 % (hill/Kandy) and 63–64 % (plains), vs 98/95/65 % without monitor — the
+  kept half of the cloud preserves the right hypothesis. The 5 % constraint was about alarm
+  frequency; the measured cost of an alarm is what matters, and it is small.
+- The χ² threshold is too tight in practice: with p_FA = 0.001 per window the nominal false-alarm
+  rate per 300 s flight would be ≈ 0.3–6 %, but 8–21 % of runs alarm — the PF's NIS is not
+  exactly χ²₁ (finite-N predictive, non-Gaussian, model mismatch from σ_p inflation).
+
+---
+
 ## 2026-11-19 — E5: consistency and the posterior Cramér–Rao bound
 
 Ensemble part (from the E1 runs, M = 300 per cell) and per-flight part (5 fixed flight plans per

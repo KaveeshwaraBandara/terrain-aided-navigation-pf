@@ -305,3 +305,78 @@ converges in \EFourInsGradeHillZeroPointOnePfFiveZeroZeroZeroConv,
     runs).}\label{tab:e4hb}
   \input{../tables/e4_height_bias.tex}
 \end{table}
+
+\subsection{E5 --- Consistency and the theoretical bound}\label{sec:e5}
+\emph{Setup:} the ensemble analysis reuses the E1 runs ($M = \EOneRuns$ per cell); the
+per-flight analysis flies five fixed flight plans per region, each $M = 100$ times with fresh
+sensor noise and initial error ($\sigma_0 = 500$\,m). The bounds use the true noise of the
+simulation (\cref{sec:pcrb}).
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e5_bound.pdf}
+  \caption{E5: RMSE over all runs (thick) and over converged runs (thin) against the ensemble
+    PCRB (black), from the E1 runs ($M = \EOneRuns$).}\label{fig:e5bound}
+\end{figure}
+
+\paragraph{The bound and ambiguity.} The posterior Cramér--Rao bound is never violated: over all
+regions, $\sigma_0$ and filters the all-run RMSE is at least 1.1 times the bound at every time step
+(\cref{tab:e5cons}), a useful end-to-end check of the simulation, the filters and the bound. How
+far above the bound the filters are depends on ambiguity (\cref{fig:e5bound}). The bound drops to
+a few metres within seconds on the hilly regions (\EFiveHillSFiveZeroZeroBound\,m in the tracking
+window on the hill country), because it only uses the slope at the true position: it describes a
+filter that already knows which hill it is over. With $\sigma_0 = 100$\,m, where false locks do not
+occur, the 20\,000-particle PF's all-run RMSE in the tracking window is
+\EFiveHillSOneZeroZeroPfTwoZeroZeroZeroZeroBoundRatioAll{} times the bound on the hill country and
+\EFivePlainsSOneZeroZeroPfTwoZeroZeroZeroZeroBoundRatioAll{} times on the plains; at $\sigma_0 =
+500$\,m the few false locks alone raise the hill-country ratio to
+\EFiveHillSFiveZeroZeroPfTwoZeroZeroZeroZeroBoundRatioAll. The gap between the thick and thin
+curves in \cref{fig:e5bound} is the price of ambiguity, which no bound based on local slopes can
+capture.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e5_anees.pdf}
+  \caption{E5: position ANEES over all runs (top) and over converged runs (bottom) at
+    $\sigma_0 = \EFiveAneesSigma$\,m, with the 95\,\% interval for a consistent filter (grey band;
+    $M = \EOneRuns$). Log scale.}\label{fig:e5anees}
+\end{figure}
+
+\paragraph{Consistency.} Over all runs the ANEES is meaningless --- up to $10^{15}$ --- because a
+falsely locked cloud is tight and far from the truth (\cref{fig:e5anees}, top). In the tracking
+window of converged runs the PF is consistent to slightly conservative: ANEES
+\EFiveHillSOneZeroZeroPfTwoZeroZeroZeroZeroAneesConv{} at $\sigma_0 = 100$\,m and
+\EFiveHillSFiveZeroZeroPfTwoZeroZeroZeroZeroAneesConv{} at 500\,m on the hill country, against a
+95\,\% interval of about [\EFiveAneesLo, \EFiveAneesHi], with
+\EFiveHillSFiveZeroZeroPfTwoZeroZeroZeroZeroInside\,\% of the individual NEES values inside their
+$\chi^2_2$ interval. Values below 2 are expected from the deliberately inflated process noise.
+During acquisition, however, even runs that eventually converge have ANEES far above 2: while
+most of the weight sits on a wrong mode and a few particles remain near the truth, the weighted
+covariance ($\sim$50\,m) understates the error ($\sim$500\,m). A Gaussian consistency measure
+simply does not fit a multimodal posterior; the NEES is informative only once the posterior is
+unimodal.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.6\textwidth]{e5_plans.pdf}
+  \caption{E5: tracking RMSE of converged runs against the per-flight PCRB, for five fixed flight
+    plans per region ($M = 100$ each, $\sigma_0 = 500$\,m). On the plains the bound is comparable
+    to the 50\,m convergence threshold, so restricting the RMSE to converged runs truncates it
+    and points fall below the diagonal; the unconditional RMSE never does.}\label{fig:e5plans}
+\end{figure}
+
+\paragraph{Why the filters stay above the bound.} Per flight (\cref{fig:e5plans,tab:e5plans}),
+the converged 20\,000-particle PF tracks at \EFivePlanHillPfTwoZeroZeroZeroZeroRatio{} times the
+bound on the hill country and \EFivePlanKandyPfTwoZeroZeroZeroZeroRatio{} times around Kandy
+(medians over the five plans). This gap was tested rather than assumed: a Kalman filter that knows
+the true terrain slopes along the path but uses the particle filter's tuning ($\sigma_p = 2$\,m per
+step instead of the true $\approx 0.05$\,m) has an actual tracking RMSE of
+\EFivePlanHillPfTwoZeroZeroZeroZeroTuned\,m on the hill country --- the mismatched-gain
+recursion of \cref{app:mismatch} --- and the particle filter reaches
+\EFivePlanHillPfTwoZeroZeroZeroZeroRmse\,m, i.e.\ \EFivePlanHillPfTwoZeroZeroZeroZeroRatioTuned{}
+times what its tuning allows (Kandy: \EFivePlanKandyPfTwoZeroZeroZeroZeroRatioTuned). Nearly the
+whole factor of two to the bound is the deliberate process-noise inflation, not the particle
+approximation. With 5\,000 particles about 20\,\% of Monte Carlo error is added
+(\EFivePlanHillPfFiveZeroZeroZeroRatioTuned); the EKF's converged runs are
+\EFivePlanHillEkfRatioTuned{} times the tuned limit, because it linearises at its own estimate
+rather than at the truth.

@@ -17,3 +17,25 @@ studies:
       init.position_sigma: [250, 2000]
       particle_filter.monitor.window: [5, 10, 20]
       particle_filter.monitor.false_alarm_prob: [0.01, 0.001]
+  test:
+    # parameters from the dev study (results/e6/dev_choice.json, rule + recorded extension);
+    # roughening K = 0.05 from E3; four variants fixed before this study ran
+    runs: 300
+    filters:
+      pf_5000: {family: particle_filter, set: {particle_filter.n_particles: 5000}}
+      pf_monitor:
+        family: particle_filter
+        set: {particle_filter.n_particles: 5000, particle_filter.monitor.enabled: true,
+              particle_filter.monitor.window: 20, particle_filter.monitor.false_alarm_prob: 0.001,
+              particle_filter.monitor.fraction: 0.5}
+      pf_rough:
+        family: particle_filter
+        set: {particle_filter.n_particles: 5000, particle_filter.roughening: 0.05}
+      pf_monitor_rough:
+        family: particle_filter
+        set: {particle_filter.n_particles: 5000, particle_filter.roughening: 0.05,
+              particle_filter.monitor.enabled: true, particle_filter.monitor.window: 20,
+              particle_filter.monitor.false_alarm_prob: 0.001,
+              particle_filter.monitor.fraction: 0.5}
+    grid:
+      init.position_sigma: [250, 2000]
