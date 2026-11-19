@@ -1,0 +1,98 @@
+{
+  "hill_country": {
+    "demtype": "COP30",
+    "request_bbox_wgs84": {
+      "south": 6.74,
+      "north": 7.1,
+      "west": 80.72,
+      "east": 81.08
+    },
+    "raw_file": "data/raw/hill_country_cop30.tif",
+    "raw_sha256": "5624e5d5b00d6a99836ab92a2d531701690cf17158cc547d272f9fe53a478fe7",
+    "raw_nodata_or_sea_fraction": 0.0,
+    "processed_file": "data/processed/hill_country_utm44n.tif",
+    "processed_sha256": "8de75ff62132bb79d371cf1ad5e1d563d7891973c4f569a99df3ff04f08b6779",
+    "elevation_sha256": "436d50038066461d8ca495059cdd8cc8ee305d8987370ebeeb59ef4d136f8a1b",
+    "crs": "EPSG:32644",
+    "shape": [
+      1327,
+      1325
+    ],
+    "res_m": 30.0,
+    "bounds_utm_m": {
+      "left": 469071.44908567215,
+      "right": 508821.44908567215,
+      "bottom": 745018.2452943322,
+      "top": 784828.2452943322
+    },
+    "crop": {
+      "rows_removed": 1,
+      "cols_removed": 2,
+      "interior_nodata_cells": 0
+    }
+  },
+  "kandy_rolling": {
+    "demtype": "COP30",
+    "request_bbox_wgs84": {
+      "south": 7.22,
+      "north": 7.58,
+      "west": 80.34,
+      "east": 80.7
+    },
+    "raw_file": "data/raw/kandy_rolling_cop30.tif",
+    "raw_sha256": "33cf63ffcd3bb5f44318e76aef04855d19da9ff6fb20dfd1ab8fffe0246e3ecd",
+    "raw_nodata_or_sea_fraction": 0.0,
+    "processed_file": "data/processed/kandy_rolling_utm44n.tif",
+    "processed_sha256": "0de0ab5c16520618ff2a0206c1d794a85852c41586224bfcbb48a8ad8c1b047d",
+    "elevation_sha256": "2fd8ddd2634269c8c39f0ca74f4fcbda9f9d67f1f92eb3eb3609e31ea3390e94",
+    "crs": "EPSG:32644",
+    "shape": [
+      1326,
+      1323
+    ],
+    "res_m": 30.0,
+    "bounds_utm_m": {
+      "left": 427180.11334154324,
+      "right": 466870.11334154324,
+      "bottom": 798127.359737926,
+      "top": 837907.359737926
+    },
+    "crop": {
+      "rows_removed": 3,
+      "cols_removed": 3,
+      "interior_nodata_cells": 0
+    }
+  },
+  "north_central_plains": {
+    "demtype": "COP30",
+    "request_bbox_wgs84": {
+      "south": 8.24,
+      "north": 8.6,
+      "west": 80.14,
+      "east": 80.5
+    },
+    "raw_file": "data/raw/north_central_plains_cop30.tif",
+    "raw_sha256": "db46687f01b3bed5a992264c46ca5465bd1643ce960f7341d79a792c009341a5",
+    "raw_nodata_or_sea_fraction": 0.0,
+    "processed_file": "data/processed/north_central_plains_utm44n.tif",
+    "processed_sha256": "e31bbb2a6d49ce9717f257bc0abdcf05c5931a598e3c59288022a45fbae25544",
+    "elevation_sha256": "d2f69344bcb0682948d94d94ce792a469cdd86b6ff14115c3bd5a6a63850d8f7",
+    "crs": "EPSG:32644",
+    "shape": [
+      1325,
+      1319
+    ],
+    "res_m": 30.0,
+    "bounds_utm_m": {
+      "left": 405356.25042041315,
+      "right": 444926.25042041315,
+      "bottom": 910941.3620726753,
+      "top": 950691.3620726753
+    },
+    "crop": {
+      "rows_removed": 5,
+      "cols_removed": 4,
+      "interior_nodata_cells": 0
+    }
+  }
+}

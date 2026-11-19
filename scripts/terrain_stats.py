@@ -85,6 +85,66 @@ def main() -> None:
         xmin, xmax, ymin, ymax = dems[n].extent
         macros[macro_name("terr", SHORT[n], "width km")] = fmt((xmax - xmin) / 1e3, 1)
         macros[macro_name("terr", SHORT[n], "height km")] = fmt((ymax - ymin) / 1e3, 1)
+    # region boxes (as requested from OpenTopography) and the processed grids
+    if not args.synthetic_only:
+        import json
+
+        from tan.config import REPO_ROOT
+
+        manifest = json.loads((REPO_ROOT / "data" / "manifest.json").read_text())
+        regions = load_regions()
+        brows, bcsv = [], []
+        for n in names[:-1]:
+            b, m = regions[n], manifest[n]
+            w = (m["bounds_utm_m"]["right"] - m["bounds_utm_m"]["left"]) / 1e3
+            h = (m["bounds_utm_m"]["top"] - m["bounds_utm_m"]["bottom"]) / 1e3
+            brows.append(
+                [
+                    TITLES[n],
+                    f"{b['south']:.2f}--{b['north']:.2f}",
+                    f"{b['west']:.2f}--{b['east']:.2f}",
+                    f"{w:.1f} $\\times$ {h:.1f}",
+                    f"{m['shape'][0]}\\,$\\times$\\,{m['shape'][1]}",
+                ]
+            )
+            bcsv.append(
+                [
+                    n,
+                    b["south"],
+                    b["north"],
+                    b["west"],
+                    b["east"],
+                    w,
+                    h,
+                    *m["shape"],
+                    m["elevation_sha256"],
+                ]
+            )
+        write_table(
+            "regions",
+            [
+                "Region",
+                "Latitude ($^\\circ$N)",
+                "Longitude ($^\\circ$E)",
+                "Size (km)",
+                "Grid (30 m cells)",
+            ],
+            brows,
+            align="lrrrr",
+            csv_header=[
+                "region",
+                "south",
+                "north",
+                "west",
+                "east",
+                "width_km",
+                "height_km",
+                "rows",
+                "cols",
+                "elevation_sha256",
+            ],
+            csv_rows=bcsv,
+        )
     write_macros("terrain", macros)
 
     # --- overview figure: hillshade + elevation colour, one panel per region
@@ -100,18 +160,21 @@ def main() -> None:
             h = dem.elevation
             xmin, xmax, ymin, ymax = dem.extent
             ext = (0.0, (xmax - xmin) / 1e3, 0.0, (ymax - ymin) / 1e3)
-            rgb = ls.shade(
-                h,
-                cmap=ELEVATION_CMAP,
-                vert_exag=2.0,
-                dx=dem.res,
-                dy=dem.res,
-                blend_mode="overlay",
-                vmin=float(h.min()),
-                vmax=float(h.max()),
+            # elevation colour ramp + translucent grey hillshade (no colour-shifting blend)
+            sm = ax.imshow(
+                h, cmap=ELEVATION_CMAP, extent=ext, origin="upper", interpolation="nearest"
             )
-            ax.imshow(rgb, extent=ext, origin="upper", interpolation="nearest")
-            sm = ax.imshow(h, cmap=ELEVATION_CMAP, extent=ext, visible=False)
+            shade = ls.hillshade(h, vert_exag=2.0, dx=dem.res, dy=dem.res)
+            ax.imshow(
+                shade,
+                cmap="gray",
+                extent=ext,
+                origin="upper",
+                alpha=0.35,
+                vmin=0,
+                vmax=1,
+                interpolation="nearest",
+            )
             cb = fig.colorbar(sm, ax=ax, shrink=0.8, pad=0.01)
             cb.set_label("Elevation (m)")
             cb.outline.set_visible(False)

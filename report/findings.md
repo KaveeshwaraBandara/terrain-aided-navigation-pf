@@ -18,6 +18,31 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — M1: real terrain downloaded, regions chosen by the pre-registered rule
+
+- OpenTopography key works. Survey: one COP90 request over Sri Lanka (33.9 MB). The rule picked
+  (0.36° boxes, ≈ 39.8 km × 39.8 km after reprojection; 0 % no-data/sea in all three):
+
+  | Region | Box (°N / °E) | 1 km roughness on COP90 (candidates) |
+  |---|---|---|
+  | hill_country | 6.74–7.10 / 80.72–81.08 | 65.2 m (max of 144, range 56.4–65.2) |
+  | kandy_rolling | 7.22–7.58 / 80.34–80.70 | 37.8 m (min of 144, range 37.8–59.4) |
+  | north_central_plains | 8.24–8.60 / 80.14–80.50 | 3.4 m (min of 144, range 3.4–5.9) |
+
+  The "moderate" target (geometric mean of the other two) was 14.9 m; **no box around Kandy is
+  that smooth**, so the least rough one was chosen. The Kandy region is intermediate, but nearer
+  the rugged end — to be kept in mind when interpreting results.
+- On the 30 m data (`report/tables/terrain_stats.csv`): roughness 64.5 / 37.7 / 3.5 m and
+  Fisher information density 12.9 / 6.9 / 0.12 × 10⁻³ m⁻² (hill / Kandy / plains): one altimeter
+  sample over the hill country carries ≈ 100× the position information of one over the plains.
+  The synthetic reference has a similar 1 km roughness to the hill country (62.7 m) but less than
+  half its information density (5.6 × 10⁻³ m⁻²): smooth Gaussian hills lack the real 30 m texture.
+  This supports the earlier hypothesis that the real DEM is harder for the EKF's local
+  linearisation and easier for a filter that uses the full likelihood — to be tested in E1.
+- `data/manifest.json` records SHA-256 of raw, processed and elevation arrays for every region.
+
+---
+
 ## 2026-11-19 — Reference check (A9)
 
 Checked against DOI registration records (Crossref), publisher/author pages and the PDFs:

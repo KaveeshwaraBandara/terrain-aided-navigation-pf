@@ -1,24 +1,23 @@
-# Study regions (WGS84 lat/lon bounding boxes, ~20 km x 20 km each).
-# Boxes are approximate — adjust after looking at the hillshade.
-# Every region is reprojected to UTM zone 44N (EPSG:32644), which covers all of Sri Lanka.
+# Study regions (WGS84 lat/lon boxes, 0.36° ≈ 40 km × 40 km), chosen by
+# scripts/survey_regions.py with the pre-registered roughness rule described there.
+# Every region is reprojected to UTM zone 44N (EPSG:32644).
 
 hill_country:
-  description: Central highlands around Nuwara Eliya — high, rugged relief (informative terrain)
-  south: 6.85
-  north: 7.03
-  west: 80.68
-  east: 80.86
-
+  description: Central highlands around Nuwara Eliya — rugged relief (informative
+    terrain)
+  south: 6.74
+  north: 7.1
+  west: 80.72
+  east: 81.08
 kandy_rolling:
-  description: Hills and valleys around Kandy — moderate relief
-  south: 7.20
-  north: 7.38
-  west: 80.54
-  east: 80.72
-
+  description: Mid-country around Kandy — intermediate relief
+  south: 7.22
+  north: 7.58
+  west: 80.34
+  east: 80.7
 north_central_plains:
-  description: Dry-zone plains near Anuradhapura — very flat (uninformative terrain)
-  south: 8.22
-  north: 8.40
-  west: 80.30
-  east: 80.48
+  description: Dry-zone plains around Anuradhapura — flat (uninformative terrain)
+  south: 8.24
+  north: 8.6
+  west: 80.14
+  east: 80.5
