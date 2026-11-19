@@ -22,7 +22,7 @@ One filter step for particles {x_i, w_i}, i = 1..N:
 from __future__ import annotations
 
 import numpy as np
-from scipy.special import logsumexp
+from scipy.special import gammaln, logsumexp
 
 from ..dem import DEM
 from .base import Estimator
@@ -43,10 +43,14 @@ class ParticleFilter(Estimator):
         ess_threshold: float = 0.5,
         roughening: float = 0.0,
         snapshot_every: int = 0,
+        likelihood: str = "gaussian",
+        nu: float = 4.0,
         rng: np.random.Generator | None = None,
     ) -> None:
         if resampling not in RESAMPLERS:
             raise ValueError(f"unknown resampling '{resampling}', choose from {list(RESAMPLERS)}")
+        if likelihood not in ("gaussian", "student_t"):
+            raise ValueError(f"unknown likelihood '{likelihood}' (gaussian | student_t)")
         self.dem = dem
         self.n = int(n_particles)
         self.meas_sigma = float(meas_sigma)
@@ -57,11 +61,13 @@ class ParticleFilter(Estimator):
         self.ess_threshold = float(ess_threshold)
         self.roughening = float(roughening)
         self.snapshot_every = int(snapshot_every)
+        self.likelihood = likelihood
+        self.nu = float(nu)
         self.rng = rng if rng is not None else np.random.default_rng()
 
         self.particles = np.zeros((self.n, 4))  # (N, 4) = [px, py, bx, by]
         self.log_weights = np.full(self.n, -np.log(self.n))
-        self.history: dict[str, list] = {"ess": [], "resampled": []}
+        self.history: dict[str, list] = self._empty_history()
         self.snapshots: list[tuple[int, np.ndarray]] = []  # (step, (N, 2) positions)
         self._k = 0
 
@@ -69,9 +75,13 @@ class ParticleFilter(Estimator):
     def initialize(self, mean: np.ndarray, cov: np.ndarray) -> None:
         self.particles = self.rng.multivariate_normal(mean, cov, size=self.n)
         self.log_weights = np.full(self.n, -np.log(self.n))
-        self.history = {"ess": [], "resampled": []}
+        self.history = self._empty_history()
         self.snapshots = [(0, self.particles[:, :2].copy())] if self.snapshot_every else []
         self._k = 0
+
+    @staticmethod
+    def _empty_history() -> dict[str, list]:
+        return {"ess": [], "resampled": [], "log_evidence": [], "nis": []}
 
     @property
     def weights(self) -> np.ndarray:
@@ -96,6 +106,8 @@ class ParticleFilter(Estimator):
         self._k += 1
         self.history["ess"].append(float(ess))
         self.history["resampled"].append(bool(resampled))
+        self.history["log_evidence"].append(self._last_log_evidence)
+        self.history["nis"].append(self._last_nis)
         if self.snapshot_every and self._k % self.snapshot_every == 0:
             self.snapshots.append((self._k, self.particles[:, :2].copy()))
         return self.estimate()
@@ -116,12 +128,31 @@ class ParticleFilter(Estimator):
         )
         self.particles[:, 2:] += self.rng.normal(0.0, self.sigma_bias, size=(n, 2))
 
-    def update(self, z: float) -> None:
-        """Re-weight particles by the terrain likelihood p(z | p_i) = N(z; h(p_i), σ_z²).
+    def log_likelihood(self, residual: np.ndarray) -> np.ndarray:
+        """log p(z | x_i) as a function of the residual z − h(p_i), with its constant.
 
-        Log space: log w_i += -½ ((z − h(p_i)) / σ_z)². The Gaussian's normalising
-        constant is the same for every particle, so it cancels on normalisation and
-        is dropped. Working with logs avoids underflow: one 50 m misfit at σ_z = 3.6 m
+        gaussian:   −½ log(2π σ²) − ½ (r/σ)²
+        student_t:  log Γ((ν+1)/2) − log Γ(ν/2) − ½ log(ν π σ²) − (ν+1)/2 · log(1 + (r/σ)²/ν)
+
+        The constants cancel when the weights are normalised; they are kept so the
+        log evidence log p(z_k | z_{1:k-1}) is comparable between the two models.
+        The Student-t has heavy tails: a 100 m outlier costs it only a few units of
+        log-likelihood instead of hundreds, so one bad altimeter sample cannot wipe
+        out the particles near the truth.
+        """
+        s = self.meas_sigma
+        r = residual / s
+        if self.likelihood == "gaussian":
+            return -0.5 * np.log(2.0 * np.pi * s * s) - 0.5 * r * r
+        nu = self.nu
+        const = gammaln(0.5 * (nu + 1.0)) - gammaln(0.5 * nu) - 0.5 * np.log(nu * np.pi * s * s)
+        return const - 0.5 * (nu + 1.0) * np.log1p(r * r / nu)
+
+    def update(self, z: float) -> None:
+        """Re-weight particles by the terrain likelihood p(z | p_i).
+
+        Log space: log w_i += log p(z | p_i) (Gaussian: −½ ((z − h(p_i)) / σ_z)² plus a
+        constant). Working with logs avoids underflow: one 50 m misfit at σ_z = 3.6 m
         is a factor e^-96, which is already near the limit of float64.
 
         Particles outside the DEM get zero weight: the map is chosen to cover the
@@ -129,16 +160,28 @@ class ParticleFilter(Estimator):
         the clamped edge height would compare the measurement with fake flat
         terrain.) If every surviving particle is off the map, the clamped
         likelihood is used instead so the filter cannot collapse to all-zero weights.
+
+        Also recorded, for divergence monitoring (no ground truth needed):
+        - log evidence  log p(z_k | z_{1:k-1}) ≈ log Σ_i w_i p(z_k | x_i)
+        - NIS  (z − ẑ)² / S  with ẑ = Σ w_i h(p_i),  S = Σ w_i (h(p_i) − ẑ)² + σ_z²
         """
+        z = float(z)
         px, py = self.particles[:, 0], self.particles[:, 1]
         h = self.dem.height(px, py)
-        r = (float(z) - h) / self.meas_sigma
-        loglik = -0.5 * r * r
+        loglik = self.log_likelihood(z - h)
+
+        w_prev = self.weights
+        z_hat = float(w_prev @ h)
+        s_pred = float(w_prev @ (h - z_hat) ** 2) + self.meas_sigma**2
+        self._last_nis = (z - z_hat) ** 2 / s_pred
 
         new = self.log_weights + np.where(self.dem.contains(px, py), loglik, -np.inf)
-        if not np.isfinite(logsumexp(new)):
+        evidence = logsumexp(new)
+        if not np.isfinite(evidence):
             new = self.log_weights + loglik
-        self.log_weights = new - logsumexp(new)  # keep Σ w_i = 1 in log form
+            evidence = logsumexp(new)
+        self._last_log_evidence = float(evidence)
+        self.log_weights = new - evidence  # keep Σ w_i = 1 in log form
 
     def estimate(self) -> tuple[np.ndarray, np.ndarray]:
         """Weighted mean (MMSE estimate) and weighted covariance of the particle cloud.

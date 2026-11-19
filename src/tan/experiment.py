@@ -11,7 +11,7 @@ from .config import REPO_ROOT
 from .dem import DEM
 from .filters import DeadReckoning, Estimator, ExtendedKalmanFilter, ParticleFilter
 from .metrics import position_error
-from .simulate import SimResult, initial_belief, simulate
+from .simulate import SimResult, filter_rng, initial_belief, run_streams, simulate
 
 
 def build_dem(cfg: dict[str, Any]) -> DEM:
@@ -62,27 +62,29 @@ def run_filter(f: Estimator, sim: SimResult) -> FilterRun:
         run.extras = {
             "ess": np.array(f.history["ess"]),
             "resampled": np.array(f.history["resampled"], dtype=bool),
+            "log_evidence": np.array(f.history["log_evidence"]),
+            "nis": np.array(f.history["nis"]),
             "snapshots": f.snapshots,
             "n_particles": f.n,
         }
     return run
 
 
-def run_once(
-    cfg: dict[str, Any], dem: DEM, rng: np.random.Generator
-) -> tuple[SimResult, dict[str, FilterRun]]:
-    sim = simulate(cfg["simulation"], cfg["init"], dem, rng)
+def run_once(cfg: dict[str, Any], dem: DEM, run: int) -> tuple[SimResult, dict[str, FilterRun]]:
+    """One Monte Carlo run with common random numbers: the flight and noise come from
+    the run's named streams, and each filter family has its own stream."""
+    seed = int(cfg["seed"])
+    sim = simulate(cfg["simulation"], cfg["init"], dem, run_streams(seed, run))
     runs = {}
     for name in cfg["experiment"]["filters"]:
-        f = make_filter(name, cfg, dem, rng)
+        f = make_filter(name, cfg, dem, filter_rng(seed, run, name))
         runs[name] = run_filter(f, sim)
     return sim, runs
 
 
 def run_monte_carlo(cfg: dict[str, Any], dem: DEM | None = None):
-    """Independent runs with seeds spawned from ``cfg['seed']`` (reproducible)."""
+    """Runs 0..M-1 of ``cfg['seed']`` (reproducible; serial — see tan.runner for sweeps)."""
     dem = dem if dem is not None else build_dem(cfg)
     n_runs = int(cfg["experiment"]["monte_carlo_runs"])
-    seeds = np.random.SeedSequence(int(cfg["seed"])).spawn(n_runs)
-    results = [run_once(cfg, dem, np.random.default_rng(s)) for s in seeds]
+    results = [run_once(cfg, dem, i) for i in range(n_runs)]
     return dem, results

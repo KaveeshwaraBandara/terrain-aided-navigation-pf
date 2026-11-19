@@ -91,3 +91,36 @@ def test_off_map_particles_get_zero_weight(synthetic_dem, rng):
     w = pf.weights
     assert np.all(w[:50] == 0.0)
     assert np.isclose(w.sum(), 1.0)
+
+
+@pytest.mark.parametrize("likelihood", ["gaussian", "student_t"])
+def test_likelihood_is_a_normalised_density(synthetic_dem, likelihood):
+    pf = ParticleFilter(synthetic_dem, n_particles=10, likelihood=likelihood, nu=4.0)
+    r = np.linspace(-2000.0, 2000.0, 400_001)
+    area = np.trapezoid(np.exp(pf.log_likelihood(r)), r)
+    assert area == pytest.approx(1.0, abs=2e-3)
+
+
+def test_student_t_survives_a_gross_outlier(synthetic_dem, rng):
+    """One 300 m altimeter outlier: the Gaussian PF throws away the particles at the
+    truth, the Student-t PF keeps them."""
+    x0 = np.array([8000.0, 9000.0, 0.0, 0.0])
+    h_true = float(synthetic_dem.height(x0[0], x0[1]))
+    near = {}
+    for lik in ("gaussian", "student_t"):
+        pf = ParticleFilter(synthetic_dem, n_particles=4000, likelihood=lik, rng=rng)
+        pf.initialize(x0, np.diag([300.0**2] * 2 + [0.01**2] * 2))
+        pf.update(h_true + 300.0)
+        d = np.linalg.norm(pf.particles[:, :2] - x0[:2], axis=1)
+        near[lik] = pf.weights[d < 30.0].sum()
+    assert near["student_t"] > 10 * near["gaussian"]
+
+
+def test_pf_logs_evidence_and_nis(cfg, synthetic_dem, rng):
+    pf_cfg = deep_update(cfg, {"particle_filter": {"n_particles": 2000, "snapshot_every": 0}})
+    sim = _sim(cfg, synthetic_dem, rng, position_sigma=50.0)
+    run = run_filter(make_filter("particle_filter", pf_cfg, synthetic_dem, rng), sim)
+    assert run.extras["log_evidence"].shape == (sim.n_steps,)
+    assert np.all(np.isfinite(run.extras["log_evidence"]))
+    # once locked on, the normalised innovation squared averages ≈ 1 (χ²₁ mean)
+    assert 0.5 < np.mean(run.extras["nis"][-100:]) < 2.0
