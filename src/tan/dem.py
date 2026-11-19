@@ -183,3 +183,63 @@ def reproject_to_metric(
                 resampling=Resampling.bilinear,
             )
     return dst_path
+
+
+def valid_window(valid: np.ndarray) -> tuple[int, int, int, int]:
+    """Rows/cols ``(r0, r1, c0, c1)`` (half-open) of a sub-rectangle whose border is all valid.
+
+    Reprojecting a lat/lon box to UTM rotates it slightly, which leaves thin
+    no-data wedges along the edges of the output grid. This greedily trims the
+    edge row or column with the most invalid cells until the border is clean.
+    Interior voids (if any) are left for :meth:`DEM.from_geotiff` to fill.
+    """
+    valid = np.asarray(valid, dtype=bool)
+    r0, r1, c0, c1 = 0, valid.shape[0], 0, valid.shape[1]
+    while r1 - r0 > 2 and c1 - c0 > 2:
+        bad = {
+            "top": int((~valid[r0, c0:c1]).sum()),
+            "bottom": int((~valid[r1 - 1, c0:c1]).sum()),
+            "left": int((~valid[r0:r1, c0]).sum()),
+            "right": int((~valid[r0:r1, c1 - 1]).sum()),
+        }
+        worst = max(bad, key=bad.get)
+        if bad[worst] == 0:
+            break
+        if worst == "top":
+            r0 += 1
+        elif worst == "bottom":
+            r1 -= 1
+        elif worst == "left":
+            c0 += 1
+        else:
+            c1 -= 1
+    return r0, r1, c0, c1
+
+
+def crop_to_valid(src_path: str | Path, dst_path: str | Path) -> dict[str, int]:
+    """Write the largest clean-bordered sub-rectangle of ``src_path`` to ``dst_path``."""
+    import rasterio
+    from rasterio.windows import Window
+
+    with rasterio.open(src_path) as src:
+        band = src.read(1, masked=True)
+        valid = ~np.ma.getmaskarray(band) & np.isfinite(band.filled(np.nan))
+        r0, r1, c0, c1 = valid_window(valid)
+        window = Window(c0, r0, c1 - c0, r1 - r0)
+        profile = src.profile.copy()
+        profile.update(
+            width=c1 - c0,
+            height=r1 - r0,
+            transform=src.window_transform(window),
+            compress="deflate",
+        )
+        data = src.read(1, window=window)
+    dst_path = Path(dst_path)
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+    with rasterio.open(dst_path, "w", **profile) as dst:
+        dst.write(data, 1)
+    return {
+        "rows_removed": int(valid.shape[0] - (r1 - r0)),
+        "cols_removed": int(valid.shape[1] - (c1 - c0)),
+        "interior_nodata_cells": int((~valid[r0:r1, c0:c1]).sum()),
+    }
