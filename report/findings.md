@@ -18,6 +18,29 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — E4: robustness to model mismatch (hill country + Kandy, σ₀ = 500 m, M = 100)
+
+Converged % (hill / Kandy):
+- **Radar outliers** (N(0, 100 m) with probability p): Gaussian PF 96/92 → 91/78 → 65/39 →
+  42/23 % for p = 0, 1, 5, 10 %; **Student-t PF (ν = 4) 97/95 → 97/96 → 95/96 → 94/92 %**, with
+  tracking RMSE ≈ 8–10 m throughout (Gaussian PF degrades to ≈ 19 m). At p = 0 the Student-t
+  costs nothing. EKF 23 % → 0 % (hill). Heavy tails are a free robustness gain here.
+- **Map error** (correlated field std 2.4 m, ℓ = 1 km, plus a constant offset): the field alone
+  is harmless (94/86 %). A **constant offset is what hurts**: nominal PF 73/60 % at 5 m,
+  25/14 % at 10 m, 0/0 % at 20 m. σ_z × 4 (14.4 m) keeps 96/90 % at 5 m and 80/61 % at 10 m but
+  only 11/9 % at 20 m. The **offset-state PF** is the only variant that still works at 20 m
+  (48/48 %) and it estimates the offset well (mean estimate 18.3 / 19.4 m for a true 20 m,
+  error std ≈ 4 m, converged runs) — **but it pays for it when there is no offset: 64/61 %
+  instead of 94/86 %**: one more unknown lets a profile match at more places, and 5 000 particles
+  now cover five dimensions. Trade-off, reported as such; a Rao-Blackwellised offset (linear in
+  the measurement) or more particles would be the obvious next steps.
+- **INS grade** (initial bias std 0.1 / 0.3 / 1.0 m/s): PF 95/96/83 % (hill), tracking RMSE
+  6.4 / 8.2 / 15.9 m; EKF 36/23/17 %; dead reckoning never converges. The worse the INS, the
+  worse the tracking, because the bias random walk the filters assume is small and the bias
+  must be learned from terrain alone.
+
+---
+
 ## 2026-11-19 — E6 test design, fixed before the test runs (extends the pre-registration)
 
 The E6 test study (main seeds, M = 300, σ₀ ∈ {250, 2000} m, all three regions) will run four

@@ -62,8 +62,8 @@ LABELS = {
     "rbpf": "RBPF",
     "pf_monitor": "PF + divergence monitor",
     "pf_student_t": "PF, Student-t likelihood",
-    "pf_sz_x2": "PF, σ_z × 2",
-    "pf_sz_x4": "PF, σ_z × 4",
+    "pf_sz_x2": r"PF, $\sigma_z \times 2$",
+    "pf_sz_x4": r"PF, $\sigma_z \times 4$",
     "pf_hbias": "PF + offset state",
 }
 ELEVATION_CMAP = LinearSegmentedColormap.from_list("elev", ["#f6f1e7", "#c9a77c", "#5b3a1e"])

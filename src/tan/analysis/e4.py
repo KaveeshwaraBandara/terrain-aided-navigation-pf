@@ -84,9 +84,14 @@ def make(exp: str = "e4", quick: bool = False) -> None:
                 axes[1, j].set_xlabel(xlabel)
             axes[0, 0].set_ylabel("Converged runs (%)")
             axes[1, 0].set_ylabel("Tracking RMSE (m)")
-            axes[1, 0].set_yscale("log")
             handles, labels = axes[0, 0].get_legend_handles_labels()
-            fig.legend(handles, labels, loc="outside lower center", ncol=min(5, len(labels)))
+            fig.legend(
+                handles,
+                labels,
+                loc="outside lower center",
+                ncol=min(5, len(labels)),
+                handlelength=3.5,
+            )
             save_report(fig, out.figure(study))
 
         for region in regions:
