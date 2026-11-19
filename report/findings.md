@@ -18,6 +18,18 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — M5: fresh clone and repository hygiene
+
+- **Fresh clone** (`git clone` of the local repo into a temporary folder, only the downloaded
+  rasters copied in, no API calls): `make setup` (fresh venv; resolved NumPy 2.5.5 vs 2.5.4 here —
+  `requirements-lock.txt` pins the versions used), `make test` (80 passed) and `make quick` (all
+  seven experiments + figures) succeed with exit code 0.
+- **Hygiene:** `.env` not tracked; no tracked file above 1.2 MB; all commits authored by the
+  owner; no AI attribution in commit messages or tracked files.
+- `requirements-lock.txt` written with `pip freeze --exclude-editable` (no local paths).
+
+---
+
 ## 2026-11-19 — M4: report and documentation
 
 - `report/latex/` is complete and Overleaf-ready (no local TeX by the owner's choice). In place of
