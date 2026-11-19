@@ -87,6 +87,15 @@ def main() -> int:
             if t.count(f"\\begin{{{env}}}") != t.count(f"\\end{{{env}}}"):
                 errors.append(f"unbalanced environment {env} in {f.name}")
 
+    # generated tables: a bare % would comment out the rest of a row
+    for t in sorted((REPO_ROOT / "report" / "tables").glob("*.tex")):
+        for i, line in enumerate(t.read_text().splitlines(), 1):
+            if not line.startswith("%") and re.search(r"(?<!\\)%", line):
+                errors.append(f"unescaped % in {t.name}:{i}")
+            text_mode = re.sub(r"\$[^$]*\$", "", line)  # drop inline maths
+            if not line.startswith("%") and re.search(r"(?<!\\)_", text_mode):
+                errors.append(f"unescaped _ outside maths in {t.name}:{i}")
+
     for e in errors:
         print("ERROR:", e)
     print(

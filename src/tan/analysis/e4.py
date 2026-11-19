@@ -22,7 +22,7 @@ from .common import (
 )
 
 STUDIES = {
-    "outliers": ("simulation.outlier_prob", "Outlier probability per measurement", 100.0, "%"),
+    "outliers": ("simulation.outlier_prob", "Outlier probability per measurement", 100.0, "\\%"),
     "map_error": ("simulation.map_error.offset_m", "Constant map / altimeter offset (m)", 1.0, ""),
     "ins_grade": ("simulation.ins.bias_sigma0", "Initial INS bias std (m/s)", 1.0, ""),
 }
@@ -170,6 +170,24 @@ def make(exp: str = "e4", quick: bool = False) -> None:
         ],
         csv_rows=csv_rows,
     )
+    # one table per study as well (the combined one is too long for a report page)
+    for study in STUDIES:
+        srows = [r[1:] for r in rows if r[0] == study.replace("_", " ")]
+        if srows:
+            out.table(
+                f"summary_{study}",
+                [
+                    "Region",
+                    "Setting",
+                    "Filter",
+                    "Conv.\\ (\\%) [95\\% CI]",
+                    "FL (\\%)",
+                    "Tracking RMSE (m) [95\\% CI]",
+                    "RMSE (m)",
+                ],
+                srows,
+                align="lllrrrr",
+            )
 
     # height-offset state: how well is the true offset recovered?
     d = df[(df["study"] == "map_error") & (df["filter"] == "pf_hbias")]

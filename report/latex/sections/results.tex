@@ -232,3 +232,76 @@ Too much of it blurs the information the measurements provide.
     for multinomial and residual resampling and the floor/ceil lower bound.}\label{tab:e3var}
   \input{../tables/e3_offspring_variance.tex}
 \end{table}
+
+\subsection{E4 --- Robustness to model mismatch}\label{sec:e4}
+\emph{Setup:} hill country and Kandy (where a nominal filter converges, so there is something to
+lose), $\sigma_0 = 500$\,m, $M = \EFourRuns$ per cell; the simulated world violates one model
+assumption at a time while the filters keep their nominal models unless stated.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e4_outliers.pdf}
+  \caption{E4: radar-altimeter outliers ($\mathcal{N}(0, 100^2)$\,m with the given probability per
+    measurement). Gaussian vs.\ Student-$t$ ($\nu = 4$) likelihood; $M = \EFourRuns$, 95\,\%
+    intervals.}\label{fig:e4outliers}
+\end{figure}
+
+\paragraph{Altimeter outliers.} With the Gaussian likelihood the particle filter's convergence on
+the hill country falls from \EFourOutliersHillZeroPfFiveZeroZeroZeroConv\,\% without outliers to
+\EFourOutliersHillOnePfFiveZeroZeroZeroConv\,\%, \EFourOutliersHillFivePfFiveZeroZeroZeroConv\,\%
+and \EFourOutliersHillOneZeroPfFiveZeroZeroZeroConv\,\% when 1, 5 and 10\,\% of the radar samples
+are gross errors (\cref{fig:e4outliers}): one outlier can wipe out the particles at the truth
+(\cref{sec:studentt}). The Student-$t$ likelihood removes the problem: \EFourOutliersHillZeroPfStudentTConv,
+\EFourOutliersHillOnePfStudentTConv, \EFourOutliersHillFivePfStudentTConv{} and
+\EFourOutliersHillOneZeroPfStudentTConv\,\% for the same runs, with an unchanged tracking error,
+and it costs nothing when there are no outliers. The EKF, already fragile, does not converge at
+all once outliers are frequent.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e4_map_error.pdf}
+  \caption{E4: map error --- a spatially correlated field (std 2.4\,m, correlation length 1\,km,
+    both assumptions derived from the handbook accuracy) plus a constant offset between the
+    measured and the mapped surface. Remedies: measurement std inflated $\times2$ and $\times4$,
+    and an extra state for the offset. $M = \EFourRuns$. The EKF is in \cref{tab:e4} only.}
+  \label{fig:e4map}
+\end{figure}
+
+\paragraph{Map error.} A random map-error field of the size the Copernicus handbook implies is
+harmless (\EFourMapErrorHillZeroPfFiveZeroZeroZeroConv\,\% convergence; \cref{fig:e4map}). A
+\emph{constant} offset between the measured and the mapped height --- a barometric bias, or a radar
+that sees the ground under a canopy the surface model includes --- is not: the nominal filter
+converges in \EFourMapErrorHillFivePfFiveZeroZeroZeroConv\,\% of the runs at 5\,m,
+\EFourMapErrorHillOneZeroPfFiveZeroZeroZeroConv\,\% at 10\,m and
+\EFourMapErrorHillTwoZeroPfFiveZeroZeroZeroConv\,\% at 20\,m, because a profile shifted in height
+matches the map best at the wrong place. Inflating $\sigma_z$ fourfold tolerates the offset up
+to 10\,m (\EFourMapErrorHillOneZeroPfSzXFourConv\,\%) but not 20\,m
+(\EFourMapErrorHillTwoZeroPfSzXFourConv\,\%). Estimating the offset as a fifth state is the only
+remedy that still works at 20\,m (\EFourMapErrorHillTwoZeroPfHbiasConv\,\%), and it recovers the
+offset itself (mean estimate \EFourHbHillOTwoZeroMean\,m for a true 20\,m; \cref{tab:e4hb}). It
+pays for this when there is no offset: \EFourMapErrorHillZeroPfHbiasConv\,\% instead of
+\EFourMapErrorHillZeroPfFiveZeroZeroZeroConv\,\%, because with an unknown offset a terrain
+profile matches at more places, and the same 5\,000 particles now have to cover five dimensions.
+This is a genuine trade-off, not a free improvement.
+
+\paragraph{INS grade.} With an initial bias std of 0.1, 0.3 and 1.0\,m/s the particle filter
+converges in \EFourInsGradeHillZeroPointOnePfFiveZeroZeroZeroConv,
+\EFourInsGradeHillZeroPointThreePfFiveZeroZeroZeroConv{} and
+\EFourInsGradeHillOnePfFiveZeroZeroZeroConv\,\% of the runs (EKF:
+\EFourInsGradeHillZeroPointOneEkfConv, \EFourInsGradeHillZeroPointThreeEkfConv,
+\EFourInsGradeHillOneEkfConv\,\%) and its tracking error grows with the bias
+(\cref{fig:e4ins}): a poor INS makes the terrain do more of the work.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e4_ins_grade.pdf}
+  \caption{E4: INS grade (initial velocity-bias std per axis); $M = \EFourRuns$. Dead reckoning
+    never converges and is omitted.}\label{fig:e4ins}
+\end{figure}
+
+\begin{table}[t]
+  \centering\small
+  \caption{E4: offset estimated by the offset-state PF (mean over the final 100\,s, converged
+    runs).}\label{tab:e4hb}
+  \input{../tables/e4_height_bias.tex}
+\end{table}
