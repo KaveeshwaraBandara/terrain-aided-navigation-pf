@@ -40,9 +40,11 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
   converges in 97–99 % (hill/Kandy) and 63–64 % (plains), vs 98/95/65 % without monitor — the
   kept half of the cloud preserves the right hypothesis. The 5 % constraint was about alarm
   frequency; the measured cost of an alarm is what matters, and it is small.
-- The χ² threshold is too tight in practice: with p_FA = 0.001 per window the nominal false-alarm
-  rate per 300 s flight would be ≈ 0.3–6 %, but 8–21 % of runs alarm — the PF's NIS is not
-  exactly χ²₁ (finite-N predictive, non-Gaussian, model mismatch from σ_p inflation).
+- Expected false-alarm rate: the window test runs every step on a sliding window, so with
+  p_FA = 0.001 per test the nominal rate per 300 s flight lies between ≈ 1.5 % (≈ 15 independent
+  20-step windows) and the union bound ≈ 28 %; the observed 5–9 % (L = 20) is inside that range,
+  so there is no evidence that the χ² calibration is off. (Correction of an earlier line in this
+  entry that quoted an underived "0.3–6 %".)
 
 ---
 
