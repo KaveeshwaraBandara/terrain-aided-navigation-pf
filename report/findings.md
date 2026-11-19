@@ -18,6 +18,44 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — Rubric self-check (final entry)
+
+Against the five grading criteria of the brief, in order:
+
+1. **Correctness of the implementation.** Strong evidence: PF and RBPF reproduce the exact Kalman
+   filter on planar terrain (RBPF ≤ 0.19 σ; PF ≤ 0.17 σ in four of five seeds, the fifth explained
+   by bias impoverishment and gone when the bias is rejuvenated); the PCRB recursion equals the
+   Kalman covariance to 3·10⁻¹¹; the true-noise model matches the simulator's empirical noise; the
+   unconditional RMSE never undercuts the ensemble bound; 83 unit tests (resampling properties,
+   likelihood normalisation, monitor behaviour, metric closed forms, common random numbers,
+   resumption); the independent reviewer found every equation consistent with the code. Weak spots:
+   the EKF baseline has no innovation gating, so the *size* of its failures is baseline-specific.
+2. **Clarity and coherence of the report.** Structure follows the brief (Introduction,
+   Methodology, Implementation, Results, Discussion, Conclusion, appendices); every number is a
+   generated macro, every table and figure is generated from saved results, and a static checker
+   replaces the missing local LaTeX build (0 problems). Risk: the PDF has not been compiled here
+   (Overleaf only), and its length is estimated, not measured.
+3. **Depth of understanding.** Paired tests and confidence intervals throughout; the PCRB is tied
+   to the results (gap explained quantitatively by the mismatched-gain analysis); selection effects
+   (converged-only RMSE, between- vs within-region correlation) and the failure of Gaussian
+   consistency measures for multimodal posteriors are discussed; claims that did not survive the
+   independent review were corrected, and the corrections are recorded above.
+4. **Effectiveness of the filter for the application.** Over the hills PF 20 000 converges in 98 %
+   (σ₀ = 500 m) and 92 % (1 km) of runs and tracks at ≈ 7–8 m; with roughening and the monitor,
+   5 000 particles reach 96 % at 2 km; 0.83 ms per step (5 000 particles) is three orders of
+   magnitude inside real time. Limits stated honestly: flat plains (≈ 21 m tracking, ≈ 50–65 %
+   convergence by the 50 m criterion), constant height offsets ≥ 10 m, simulated sensors.
+5. **Creativity and innovation.** Pre-registered, statistics-based region selection; an online
+   divergence monitor (NIS window test, mixture re-spread from the dead-reckoning belief) tuned on
+   separate development seeds; Student-t likelihood; offset state; Rao-Blackwellised filter; the
+   mismatched-gain analysis separating tuning from approximation error; common random numbers
+   across all experiments; a static report checker in place of a TeX build.
+
+Open items for the owner: compile on Overleaf and check layout/length; the E6 selection-rule
+extension and the "Kandy is not moderate" outcome are disclosed in the report.
+
+---
+
 ## 2026-11-19 — M5: independent review, and what changed because of it
 
 A fresh reviewer (no prior context, read-only) checked the report against the code and
