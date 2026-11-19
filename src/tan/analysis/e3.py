@@ -155,6 +155,10 @@ def make(exp: str = "e3", quick: bool = False) -> None:
                 color=MUTED,
             )
         a2.set_xscale("log")
+        ticks = [t for t in (0.2, 0.5, 1, 2, 5, 10) if min(xs) / 1.5 <= t <= max(xs) * 1.5]
+        a2.set_xticks(ticks)
+        a2.set_xticklabels([f"{t:g}" for t in ticks])
+        a2.minorticks_off()
         a2.set_ylabel("Tracking RMSE, converged runs (m)")
         save_report(fig, out.figure("particles"))
     add_rows("N sweep", lambda k: f"N = {k[0]:,}".replace(",", "\\,"), nstats, [(n,) for n in Ns])
@@ -198,7 +202,7 @@ def make(exp: str = "e3", quick: bool = False) -> None:
                     label=f"N = {int(f.split('_')[1]):,}".replace(",", " "),
                 )
         axes[1, 0].set_xticks(range(4))
-        axes[1, 0].set_xticklabels([s[:5] + "." if len(s) > 6 else s for s in SCHEMES])
+        axes[1, 0].set_xticklabels(["multin.", "system.", "strat.", "resid."])
         axes[0, 0].set_xticks(range(4))
         axes[0, 0].set_xticklabels([])
         axes[0, 0].legend(loc="lower left")

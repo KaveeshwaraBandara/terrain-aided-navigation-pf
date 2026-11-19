@@ -111,10 +111,14 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                 )
                 an_all = float(np.mean(nees[:, win]))
                 an_conv = float(np.mean(nees[conv][:, win])) if conv.any() else np.nan
-                # tracking phase of converged runs: how close does the filter get to the bound?
-                ratio = float(
-                    np.mean(ens[(region, s, f, "conv")][win] / ens[(region, s, "bound")][win])
-                )
+                # all runs: a valid comparison (the bound applies to the ensemble MSE), so the
+                # ratio must be >= 1 at every step; ratio_min checks that
+                bnd = ens[(region, s, "bound")]
+                ratio_all = float(np.mean(ens[(region, s, f)][win] / bnd[win]))
+                ratio_min = float(np.min(ens[(region, s, f)] / bnd))
+                # converged runs only: descriptive, *conditional* on error < 50 m, so not bounded
+                # (truncation can push it below 1 where the bound approaches the threshold)
+                ratio = float(np.mean(ens[(region, s, f, "conv")][win] / bnd[win]))
                 lo_c, hi_c = anees_bounds(int(conv.sum())) if conv.any() else (np.nan, np.nan)
                 trows.append(
                     [
@@ -125,16 +129,32 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                         fmt(an_conv, 2),
                         f"[{fmt(lo_c, 2)}, {fmt(hi_c, 2)}]",
                         f"{fmt(100 * inside, 0)}",
+                        sci(ratio_all),
                         fmt(ratio, 2),
                     ]
                 )
                 tcsv.append(
-                    [region, s, f, M, int(conv.sum()), an_all, an_conv, lo_c, hi_c, inside, ratio]
+                    [
+                        region,
+                        s,
+                        f,
+                        M,
+                        int(conv.sum()),
+                        an_all,
+                        an_conv,
+                        lo_c,
+                        hi_c,
+                        inside,
+                        ratio_all,
+                        ratio_min,
+                        ratio,
+                    ]
                 )
                 base = ("e5", REGION_SHORT.get(region, region), f"s{s:g}", f)
                 macros[macro_name(*base, "anees conv")] = fmt(an_conv, 2)
                 macros[macro_name(*base, "inside")] = fmt(100 * inside, 0)
                 macros[macro_name(*base, "bound ratio")] = fmt(ratio, 2)
+                macros[macro_name(*base, "bound ratio all")] = fmt(ratio_all, 1)
             macros[macro_name("e5", REGION_SHORT.get(region, region), f"s{s:g}", "bound")] = fmt(
                 float(np.mean(ens[(region, s, "bound")][win])), 1
             )
@@ -149,10 +169,11 @@ def make(exp: str = "e5", quick: bool = False) -> None:
             "ANEES conv.",
             "95\\% interval",
             "In $\\chi^2_2$ bounds (\\%)",
+            "RMSE / PCRB",
             "RMSE$_{\\mathrm{conv}}$ / PCRB",
         ],
         trows,
-        align="lllrrrrr",
+        align="lllrrrrrr",
         csv_header=[
             "region",
             "sigma0_m",
@@ -164,7 +185,9 @@ def make(exp: str = "e5", quick: bool = False) -> None:
             "anees_lo",
             "anees_hi",
             "fraction_inside_chi2",
-            "rmse_over_pcrb_tracking",
+            "rmse_all_over_pcrb_tracking",
+            "rmse_all_over_pcrb_min_any_step",
+            "rmse_converged_over_pcrb_tracking",
         ],
         csv_rows=tcsv,
     )

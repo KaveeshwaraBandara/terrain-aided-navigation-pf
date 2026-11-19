@@ -18,6 +18,44 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — E6 test design, fixed before the test runs (extends the pre-registration)
+
+The E6 test study (main seeds, M = 300, σ₀ ∈ {250, 2000} m, all three regions) will run four
+variants on identical flights: `pf_5000` (baseline), `pf_monitor` (window and false-alarm
+probability from the dev-seed rule; re-spread fraction 0.5), `pf_rough` (roughening K = 0.05)
+and `pf_monitor_rough` (both). **Primary comparison (as planned): monitor vs baseline.**
+Secondary: roughening and the combination, added because E3 showed roughening to be a strong
+remedy against the same failure (false lock). K = 0.05 was taken from E3 (hill country,
+σ₀ = 1 km, main seeds) — a different region/σ₀ mix than E6, but not independent data for the hill
+country, which is stated in the report.
+
+## 2026-11-19 — E3: particle-filter design (hill country, σ₀ = 1 km, M = 100)
+
+- **N:** convergence 29 % (N = 500) → 71 % (5 000) → 93 % (20 000) → 98 % (50 000); the failure
+  mode is false lock (65 % → 2 %). Tracking RMSE improves only modestly, 9.7 → 7.6 m. Runtime
+  0.2 → 7 ms per step (`report/tables/runtime.csv`): even N = 50 000 runs ≈ 140× faster than the
+  1 Hz measurement rate. Particles buy *acquisition robustness*, not tracking accuracy.
+- **Resampling scheme:** no significant difference in convergence (McNemar p ≥ 0.15 vs
+  systematic at N = 1 000 and 5 000) or tracking RMSE (overlapping CIs) — consistent with Hol et
+  al. (2006), whose RMSE effects were "not significant". Measured offspring-count variance
+  (N_eff ≈ 0.4 N, log-normal weights, 400 repetitions): multinomial 1.00 (theory 1.00),
+  residual 0.44 (theory 0.44), stratified 0.27, systematic 0.18 = the floor/ceil minimum 0.179.
+  Ranking multinomial > residual > stratified > systematic, as expected; systematic attains the
+  minimum possible variance here. Runtime: systematic is the cheapest (0.13 ms vs 0.36 ms for
+  multinomial at N = 5 000).
+- **ESS threshold:** no detectable effect between 0.1 N and 1.0 N (p ≥ 0.5).
+- **Roughening — the surprise:** K = 0.05 raises convergence from 71 % to 94 % (McNemar 24 vs 1
+  discordant runs, p < 10⁻⁴) and lowers false lock from 27 % to 6 %; K = 0.1 gives 91 % and the
+  best tracking RMSE region (6.8 m vs 8.6 m); K = 0.2 falls back to 79 % (p = 0.18). With
+  N = 5 000 and K = 0.05 the filter matches N = 20 000 without roughening at a quarter of the
+  cost. Interpretation: the jitter scales with the cloud's spread (σ = K E N^(−1/4)), i.e. it is
+  an adaptive process-noise inflation — large (tens of metres) while the cloud is wide, where it
+  keeps hypotheses near the truth alive, negligible once the cloud has collapsed. Too much (K =
+  0.2) blurs the likelihood information. On the synthetic map (12 runs, findings 2026-11-04)
+  roughening had looked unreliable; with M = 100 on real terrain the effect is clear.
+
+---
+
 ## 2026-11-19 — E2: terrain informativeness (200 random flights per region, σ₀ = 500 m)
 
 Setup: `configs/experiments/e2.yaml`; EKF and PF (N = 5 000); same flights for both.
