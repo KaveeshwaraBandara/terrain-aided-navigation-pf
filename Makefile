@@ -60,6 +60,7 @@ benchmark:        ## runtime per filter step (single process; run on an idle mac
 figures:          ## every figure, table and macro from saved results (no re-running)
 	$(BIN)/python scripts/terrain_stats.py
 	$(BIN)/python scripts/extract_listings.py
+	$(BIN)/python scripts/validation.py
 	$(BIN)/python scripts/make_figures.py --all
 
 report:           ## build the PDF if latexmk exists (otherwise compile report/latex on Overleaf)

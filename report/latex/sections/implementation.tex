@@ -1,0 +1,135 @@
+\section{Implementation}\label{sec:impl}
+
+The project is a Python package (\texttt{src/tan}, \LinesOfCode{} lines) built on NumPy and
+SciPy, with \NumTests{} unit tests and continuous integration. \Cref{fig:arch} shows the
+structure. All particle operations are vectorised over the particle array: no Python loop runs
+over particles anywhere.
+
+\begin{figure}[t]
+  \centering
+  \begin{tikzpicture}[
+      box/.style={draw, rounded corners=2pt, align=center, font=\footnotesize,
+                  minimum height=9mm, inner sep=3pt},
+      arr/.style={-{Stealth[length=2mm]}, semithick}]
+    \node[box] (data) {\texttt{data.py}\\ OpenTopography, reproject,\\ crop, manifest};
+    \node[box, right=8mm of data] (dem) {\texttt{dem.py}\\ bilinear $h(\pv)$, $\nabla h$};
+    \node[box, right=8mm of dem] (sim) {\texttt{simulate.py}\\ truth, INS, altimeters,\\ named random streams};
+    \node[box, below=9mm of dem] (filters) {\texttt{filters/}\\ PF, RBPF, EKF,\\ dead reckoning, resampling};
+    \node[box, right=8mm of filters] (runner) {\texttt{runner.py}\\ parallel, resumable\\ Monte Carlo};
+    \node[box, right=8mm of runner] (metrics) {\texttt{metrics.py}, \texttt{pcrb.py}};
+    \node[box, below=9mm of runner] (analysis) {\texttt{analysis/}\\ figures, tables,\\ \LaTeX{} macros};
+    \draw[arr] (data) -- (dem);
+    \draw[arr] (dem) -- (sim);
+    \draw[arr] (dem) -- (filters);
+    \draw[arr] (sim) -- (runner);
+    \draw[arr] (filters) -- (runner);
+    \draw[arr] (runner) -- (analysis);
+    \draw[arr] (metrics) |- (analysis);
+  \end{tikzpicture}
+  \caption{Package structure and data flow. Every estimator implements the same interface
+    (\texttt{initialize}, \texttt{predict}, \texttt{update}, \texttt{estimate}), so the runner
+    treats them identically. The report reads only the outputs of \texttt{analysis/}.}
+  \label{fig:arch}
+\end{figure}
+
+\subsection{The particle filter}
+\Cref{lst:predict,lst:update} are the predict and update steps of \cref{eq:sir}, copied from the
+source by a script so that they cannot drift from the code. The particles are an $N\times4$
+array; the prediction samples all $N$ motion-model draws at once, each particle integrating the
+INS velocity corrected by its own bias. The update evaluates the DEM at all particle positions
+with one vectorised bilinear lookup (\texttt{scipy.ndimage.map\_coordinates}), adds the
+log-likelihood to the log-weights and renormalises with log-sum-exp. Particles that leave the DEM
+get zero weight rather than reading a clamped edge height, which would compare the measurement with
+fake flat terrain. The same pass computes the predicted measurement spread for the NIS of
+\cref{sec:monitor} and the log evidence.
+
+\lstinputlisting[caption={Particle filter prediction (\texttt{ParticleFilter.predict}).},
+  label={lst:predict}]{../generated/code_pf_predict.py}
+
+\lstinputlisting[caption={Particle filter measurement update (\texttt{ParticleFilter.update}).},
+  label={lst:update}]{../generated/code_pf_update.py}
+
+Systematic resampling (\cref{lst:systematic}) needs one uniform number: evenly spaced pointers
+are located in the cumulative weights by a binary search. Pinning the last cumulative weight to
+exactly 1 and searching with \texttt{side="right"} guarantee that a particle with zero weight is
+never selected, even when a pointer lands on a boundary; a unit test checks this for all four
+schemes.
+
+\lstinputlisting[caption={Systematic resampling.},label={lst:systematic}]{../generated/code_systematic.py}
+
+The Rao-Blackwellised filter stores its particles in the same $N\times4$ array, with the Kalman
+bias means in the last two columns, so the parent class's weighting and resampling are reused
+unchanged; only the prediction (\cref{lst:rbpf}) and the covariance differ.
+
+\lstinputlisting[caption={RBPF prediction with the shared Riccati recursion
+  (\texttt{RaoBlackwellizedPF.predict}).},label={lst:rbpf}]{../generated/code_rbpf_predict.py}
+
+\subsection{Simulation}\label{sec:sim}
+The simulator is the ``world'': it knows the true trajectory and is the only component that
+reads the DEM at the true position. A flight starts at a uniformly random point with a random
+heading, flies at 40\,m/s and weaves $\pm25^\circ$ with a 120\,s period. The whole flight stays
+$3\times2000$\,m inside the map --- three times the largest initial uncertainty used --- so that
+neither the truth nor the prior reaches the edge; flights that would are redrawn. The altitude is
+constant: the highest terrain within 1\,km of the track plus 300\,m clearance. INS velocities
+and altimeter readings follow \cref{sec:models}; optional radar outliers, a spatially correlated
+map-error field and a constant offset are added for Experiment~4.
+
+Each source of randomness has its own named random stream per Monte Carlo run (flight, INS,
+altimeters, outliers, initial guess, map error, and one per filter family), and every draw has a
+fixed size and is scaled afterwards. Run $i$ is therefore identical in every configuration: a
+larger $\sigma_0$ scales the \emph{same} initial-error direction, a higher outlier rate adds
+outliers \emph{at the same instants plus new ones}, and so on. Unit tests check these invariances.
+
+\subsection{Experiments and reproducibility}
+Experiments are YAML files: a grid of parameters, a list of regions and estimator variants and a
+number of runs. One task simulates a flight once and runs every estimator on it; tasks run in
+parallel worker processes that share the DEMs in memory, and each writes a compressed file of
+time series and per-run metrics. An interrupted sweep resumes where it stopped, and each results
+folder records the git commit, the data-manifest checksum, the resolved configurations and the
+installed package versions. Figures, tables and every number quoted in this report are produced
+by scripts from these saved results (\texttt{make figures}); the data are traced by SHA-256
+checksums of the downloaded and processed rasters.
+
+Runtimes come from a separate benchmark --- one process pinned to a performance core, one maths
+thread --- because inside the parallel sweeps the workers share memory bandwidth and each runs
+several times slower. \Cref{tab:runtime} lists the cost per filter step on the hill-country DEM:
+the particle filter with $N = 5\,000$ needs \RtPfFiveZeroZeroZero{}\,ms per step, three orders
+of magnitude faster than the 1\,Hz altimeter rate. The RBPF costs the same as the plain filter
+at equal $N$ (\RtRbpfFiveZeroZeroZero{}\,ms): its bias update is cheap and it draws half as many
+random numbers.
+
+\begin{table}[t]
+  \centering\small
+  \caption{Runtime per filter step (median of \RtReps{} repetitions of a 300-step flight on the
+    hill-country DEM, single process, one performance core of the machine in
+    \cref{app:repro}).}\label{tab:runtime}
+  \input{../tables/runtime.tex}
+\end{table}
+
+\subsection{Validation}\label{sec:validation}
+Because the outputs of a particle filter are random, ``it converges on a test case'' is weak
+evidence of correctness. The decisive test uses a terrain for which the exact answer is known: on
+a tilted plane $h(\pv) = 0.05\,p_x + 0.03\,p_y + 200$ the measurement is linear and bilinear
+interpolation is exact, so the EKF \emph{is} the Kalman filter and computes the exact posterior.
+A correct particle filter must agree with it up to Monte Carlo error. Over \ValSeeds{} seeds and
+all 300 steps, the particle filter's estimate never deviates from the Kalman estimate by more than
+\ValPFPosMax{} Kalman standard deviations in position and \ValPFBiasMax{} in bias
+(\cref{tab:validation}); the RBPF, with four times fewer particles, stays within
+\ValRBPFPosMax{} and \ValRBPFBiasMax{} --- a first glimpse of the variance reduction that
+Rao-Blackwellisation promises. On the same plane the PCRB recursion reproduces the Kalman
+covariance to a relative difference of \ValPcrbRelDiff{}. Further unit tests cover the resampling
+schemes (unbiased offspring counts, zero-weight particles never selected, systematic offspring
+equal to $\lfloor N w\rfloor$ or $\lceil N w \rceil$), the likelihoods (normalised densities,
+outlier robustness), the true-noise model of the bound (against the simulator's empirical noise),
+the divergence monitor (silent while tracking, recovers from a forced false lock), the metrics
+(Wilson intervals, $\chi^2$ bounds, McNemar test against closed forms) and the runner (common
+random numbers across configurations, resumption).
+
+\begin{table}[t]
+  \centering\small
+  \caption{Particle filters against the exact Kalman filter on planar terrain ($\sigma_0 =
+    100$\,m, \ValSeeds{} seeds, worst case over the 300-step flight).}\label{tab:validation}
+  \input{../tables/validation.tex}
+\end{table}
+
+\Cref{tab:params} in the appendix lists all parameters.

@@ -23,6 +23,8 @@
 \usepackage[nameinlink,capitalise]{cleveref}
 \usepackage{textcomp}
 \usepackage{newunicodechar}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
 
 \graphicspath{{../figures/}}
 \captionsetup{font=small,labelfont=bf}
@@ -44,17 +46,18 @@
 \IfFileExists{../generated/e5.tex}{\input{../generated/e5.tex}}{}
 \IfFileExists{../generated/e6.tex}{\input{../generated/e6.tex}}{}
 \IfFileExists{../generated/e7.tex}{\input{../generated/e7.tex}}{}
-\IfFileExists{../generated/data.tex}{\input{../generated/data.tex}}{}
+\IfFileExists{../generated/validation.tex}{\input{../generated/validation.tex}}{}
+\IfFileExists{../generated/implementation.tex}{\input{../generated/implementation.tex}}{}
 
 % notation
 \newcommand{\vect}[1]{\bm{#1}}
-\newcommand{\x}{\vect{x}}
-\newcommand{\p}{\vect{p}}
+\newcommand{\xv}{\vect{x}}
+\newcommand{\pv}{\vect{p}}
 \newcommand{\bias}{\vect{b}}
 \newcommand{\uu}{\vect{u}}
-\newcommand{\N}{\mathcal{N}}
-\newcommand{\E}{\mathbb{E}}
-\newcommand{\T}{^{\mathsf{T}}}
+\newcommand{\Normal}{\mathcal{N}}
+\newcommand{\Exp}{\mathbb{E}}
+\newcommand{\trans}{^{\mathsf{T}}}
 \newcommand{\Neff}{N_{\mathrm{eff}}}
 
 \lstset{basicstyle=\ttfamily\footnotesize,breaklines=true,frame=single,columns=fullflexible,
