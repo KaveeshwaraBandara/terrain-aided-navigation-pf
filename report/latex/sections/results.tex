@@ -1,0 +1,234 @@
+\section{Results}\label{sec:results}
+
+Unless stated otherwise every experiment uses randomised 300\,s flights at 40\,m/s, the default
+parameters of \cref{tab:params}, and common random numbers: within an experiment, run $i$ has the
+same flight and noise for every filter and configuration. $M$ is the number of Monte Carlo runs
+per configuration. Brackets give 95\,\% intervals (Wilson for rates, bootstrap for RMSE).
+
+\subsection{Study regions}\label{sec:regions}
+Three $0.36^\circ\times0.36^\circ$ boxes ($\approx40\times40$\,km) were chosen with a rule fixed
+before the data were examined: on a 90\,m survey of the whole island, the roughest candidate box
+around Nuwara Eliya, the flattest around Anuradhapura, and around Kandy the box whose roughness is
+closest to the geometric mean of the two (\cref{fig:regions,tab:regions}). No box around Kandy is
+nearly as smooth as that target, so the least rough one was selected: the ``Kandy'' region is
+intermediate, but closer to the rugged end. The regions differ by two orders of magnitude in the
+position information one altimeter sample carries (\cref{tab:terrain}): the Fisher information
+density is \TerrHillFisherDensityPerMTwo{}, \TerrKandyFisherDensityPerMTwo{} and
+\TerrPlainsFisherDensityPerMTwo{}\,$\times10^{-3}$\,m$^{-2}$ for the hill country, Kandy and the
+plains. The synthetic terrain used during development has a 1\,km roughness similar to the hill
+country (\TerrSyntheticRoughnessOnekmM{} vs.\ \TerrHillRoughnessOnekmM{}\,m) but less than half of
+its information density: smooth Gaussian hills lack the slope texture of real terrain at the
+scale of a few cells --- a difference that turns out to matter for the EKF.
+
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{0.34\textwidth}\centering
+    \includegraphics[width=\textwidth]{region_map.pdf}\caption{Sri Lanka (COP90 survey).}
+  \end{subfigure}\hfill
+  \begin{subfigure}[b]{0.64\textwidth}\centering
+    \includegraphics[width=\textwidth]{terrain_overview.pdf}\caption{The three regions and the synthetic reference.}
+  \end{subfigure}
+  \caption{Study regions. Boxes in (a) were selected by the pre-registered roughness rule;
+    (b) shows the 30\,m Copernicus GLO-30 elevation (colour) with hillshading. Note the different
+    elevation scales: the plains span only 127\,m.}\label{fig:regions}
+\end{figure}
+
+\begin{table}[t]
+  \centering\small
+  \caption{Study regions as requested from OpenTopography and the processed UTM grids.}\label{tab:regions}
+  \input{../tables/regions.tex}
+\end{table}
+
+\begin{table}[t]
+  \centering\small
+  \caption{Terrain statistics (definitions in \cref{sec:data}).}\label{tab:terrain}
+  \input{../tables/terrain_stats.tex}
+\end{table}
+
+\subsection{E1 --- When does linearisation fail?}\label{sec:e1}
+\emph{Setup:} dead reckoning, EKF and particle filters with 5\,000 and 20\,000 particles on
+identical flights; $\sigma_0 \in \{100, 250, 500, 1000, 1500, 2000\}$\,m on all three regions;
+$M = \EOneRuns$ per cell (5\,400 flights in total).
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e1_rates.pdf}
+  \caption{E1: share of converged (top) and falsely locked (bottom) runs against the initial
+    position uncertainty, $M = \EOneRuns$ per point, Wilson 95\,\% bands. Dead reckoning never
+    converges and is omitted.}\label{fig:e1rates}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e1_error_vs_time.pdf}
+  \caption{E1: median position error over time (bands: interquartile range over the
+    $M = \EOneRuns$ runs) for $\sigma_0 = 500$\,m (top) and 2\,000\,m (bottom). Log scale.}\label{fig:e1time}
+\end{figure}
+
+\Cref{fig:e1rates} answers the question directly, and the answer depends strongly on the
+terrain. On the hill country the EKF fails even when the initial error is small: at
+$\sigma_0 = 100$\,m it converges in only \EOneHillSOneZeroZeroEkfConv\,\% of the runs and
+falsely locks in \EOneHillSOneZeroZeroEkfFl\,\%; at 500\,m it converges in
+\EOneHillSFiveZeroZeroEkfConv\,\% and is confidently wrong in \EOneHillSFiveZeroZeroEkfFl\,\%. The
+particle filters converge in \EOneHillSFiveZeroZeroPfFiveZeroZeroZeroConv\,\% ($N=5\,000$) and
+\EOneHillSFiveZeroZeroPfTwoZeroZeroZeroZeroConv\,\% ($N=20\,000$) of the same runs. Paired over the
+runs, the PF converges significantly more often than the EKF in every one of the 18 cells
+(McNemar, all $p < 10^{-10}$; \cref{tab:e1tests} in the appendix). This is a much earlier failure
+than on the smooth synthetic terrain, where the EKF had held up to $\sigma_0 = 1$\,km during
+development: the real DEM's slope changes within a few cells, so the one-cell Jacobian is already
+wrong when the error is a few tens of metres. The Kandy region behaves almost identically.
+
+\Cref{fig:e1time} shows how the EKF fails. Its median error \emph{grows} during the flight and
+ends well above the dead-reckoning error on both hilly regions: corrections computed from the
+wrong slope also corrupt the bias estimate, so the EKF drifts faster than the uncorrected INS.
+A linearised terrain filter is worse than no terrain aiding at all once its linearisation is
+invalid.
+
+The particle filter's limit is different. Its error drops within 10--20\,s to a few metres, and
+it degrades gracefully with $\sigma_0$: at 2\,km the filter with 20\,000 particles still converges in
+\EOneHillSTwoZeroZeroZeroPfTwoZeroZeroZeroZeroConv\,\% of the runs, the one with 5\,000 in
+\EOneHillSTwoZeroZeroZeroPfFiveZeroZeroZeroConv\,\%. Its failures are almost all false locks
+(\EOneHillSTwoZeroZeroZeroPfFiveZeroZeroZeroFl\,\% and
+\EOneHillSTwoZeroZeroZeroPfTwoZeroZeroZeroZeroFl\,\%): with a wide prior, few particles start
+close enough to the truth, and the cloud collapses onto another patch whose profile matches.
+More particles help significantly from $\sigma_0 \ge 500$\,m on every region.
+
+The flat plains tell the opposite story about failure. No filter converges reliably: even at
+$\sigma_0 = 100$\,m the 20\,000-particle PF converges in only
+\EOnePlainsSOneZeroZeroPfTwoZeroZeroZeroZeroConv\,\% of the runs, and in
+\EOnePlainsSTwoZeroZeroZeroPfTwoZeroZeroZeroZeroConv\,\% at 2\,km. Yet it almost never locks
+falsely (\EOnePlainsSTwoZeroZeroZeroPfTwoZeroZeroZeroZeroFl\,\% at 2\,km): it knows that it does
+not know. Its covariance stays wide, and its median error still falls from 500\,m to about 25\,m
+within the first 100\,s, because even 3\,m of roughness is not zero information; most of its
+``non-converged'' runs end just above the 50\,m threshold rather than lost (\cref{sec:e2}). The
+EKF on the plains, by contrast, is falsely locked in \EOnePlainsSFiveZeroZeroEkfFl\,\% of the runs
+at $\sigma_0 = 500$\,m. In the tracking phase
+of converged runs the PF's RMSE is \EOneHillSFiveZeroZeroPfTwoZeroZeroZeroZeroTrack\,m (hill
+country), \EOneKandySFiveZeroZeroPfTwoZeroZeroZeroZeroTrack\,m (Kandy) and
+\EOnePlainsSFiveZeroZeroPfTwoZeroZeroZeroZeroTrack\,m (plains) at $\sigma_0 = 500$\,m
+(\cref{tab:e1track} in the appendix).
+
+The corridor rule for the altitude puts the UAV up to \EOneRadarHillMax\,m above the terrain on
+the hill country (median of the per-flight maximum \EOneRadarHillMedian\,m); a range-independent
+3\,m radar noise is optimistic at such ranges, which is a limitation of the sensor model
+(\cref{sec:limitations}).
+
+\subsection{E2 --- Terrain informativeness}\label{sec:e2}
+\emph{Setup:} EKF and PF ($N = 5\,000$), $\sigma_0 = 500$\,m, $M = \ETwoRuns$ random flights
+per region. For every flight the terrain under the true track is characterised by its mean 1\,km
+roughness and by the terrain information $\sum_k |\nabla h(\pv_k)|^2/\sigma_z^2$, split into
+along- and cross-track components.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e2_scatter.pdf}
+  \caption{E2: RMS error over the final 100\,s of each flight against the roughness of the
+    terrain under that flight ($M = \ETwoRuns$ per region, $\sigma_0 = 500$\,m). Spearman rank
+    correlation with bootstrap 95\,\% CI over all flights.}\label{fig:e2scatter}
+\end{figure}
+
+\Cref{fig:e2scatter} relates each flight's final error to the terrain it crossed. For the particle
+filter, rougher terrain means smaller error (Spearman $\rho = \ETwoRhoPfFiveZeroZeroZero$
+[$\ETwoRhoPfFiveZeroZeroZeroLo$, $\ETwoRhoPfFiveZeroZeroZeroHi$]). For the EKF the correlation has
+the \emph{opposite} sign ($\rho = \ETwoRhoEkf$ [$\ETwoRhoEkfLo$, $\ETwoRhoEkfHi$]): the same texture that informs
+the particle filter breaks the EKF's linearisation, so its failures concentrate on the most
+informative terrain. Within a single region the correlations are weak (PF $\rho$ between
+\ETwoPlainsPfFiveZeroZeroZeroRho{} and \ETwoKandyPfFiveZeroZeroZeroRho), i.e.\ most of the effect
+is between terrain types rather than between flights over the same type. Binned by the terrain
+information collected along the flight (\cref{fig:e2binned}), the PF's convergence rate rises
+from about one half on the least informative flights to over 90\,\% on the hills.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.62\textwidth]{e2_binned.pdf}
+  \caption{E2: convergence against the terrain information along the flight (eight equal-count
+    bins pooled over the three regions; Wilson 95\,\% intervals). No flight falls between the
+    plains and the hills, hence the gap.}\label{fig:e2binned}
+\end{figure}
+
+Decomposing the tracking error into along- and cross-track components (\cref{tab:e2}) shows no
+systematic anisotropy: the PF's along/cross RMS is \ETwoHillPfFiveZeroZeroZeroAlong{}/%
+\ETwoHillPfFiveZeroZeroZeroCross\,m on the hill country, \ETwoKandyPfFiveZeroZeroZeroAlong/%
+\ETwoKandyPfFiveZeroZeroZeroCross\,m around Kandy and \ETwoPlainsPfFiveZeroZeroZeroAlong/%
+\ETwoPlainsPfFiveZeroZeroZeroCross\,m on the plains, and the along- and cross-track terrain
+information is balanced on average (ratio $\approx 1$). The expected elongation of the error along
+ridges and valleys does not appear in these averages: the 25$^\circ$ heading weave and the varied
+ridge directions inside 40\,km boxes mix the two directions. The hypothesis is therefore not
+supported at the ensemble level; it may still hold for individual straight flights along a valley,
+which this design does not isolate.
+
+\begin{table}[t]
+  \centering\small
+  \caption{E2 per region ($\sigma_0 = 500$\,m, $M = \ETwoRuns$): convergence, median roughness
+    under the flights, tracking RMS along and across the track (converged runs), median ratio of
+    along- to cross-track terrain information, and the within-region Spearman correlation between
+    roughness and final error.}\label{tab:e2}
+  \input{../tables/e2_regions.tex}
+\end{table}
+
+\subsection{E3 --- Particle-filter design}\label{sec:e3}
+\emph{Setup:} hill country, $\sigma_0 = 1$\,km, $M = \EThreeRuns$; one design parameter varied at
+a time from the defaults (systematic resampling, $\tau = 0.5$, $K = 0$).
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e3_particles.pdf}
+  \caption{E3: convergence against the number of particles (left) and tracking RMSE of converged
+    runs against the runtime per step from the single-core benchmark (right, labelled with $N$);
+    $M = \EThreeRuns$, hill country, $\sigma_0 = 1$\,km.}\label{fig:e3n}
+\end{figure}
+
+\paragraph{Number of particles.} Convergence rises from \EThreeNFiveHundredConv\,\% with 500
+particles to \EThreeNFiveKConv\,\% with 5\,000 and \EThreeNFiftyKConv\,\% with 50\,000
+(\cref{fig:e3n}), while the tracking RMSE improves only from \EThreeNFiveHundredTrack{} to
+\EThreeNFiftyKTrack\,m. Particles buy \emph{robustness of acquisition} much more than tracking accuracy:
+once locked on, 500 particles track within about 2\,m of fifty thousand. The cost is
+linear in $N$; even $N = 50\,000$ needs only \EThreeNFiftyKMs\,ms per step on one core, two
+orders of magnitude inside the real-time budget of a 1\,Hz altimeter.
+
+\paragraph{Resampling.} The four schemes do not differ significantly in convergence (McNemar
+$p \ge 0.15$ against systematic at both $N$; \cref{tab:e3tests}) or tracking RMSE (overlapping
+intervals, \cref{fig:e3design}). The schemes do differ in what they are designed to differ in:
+measured directly, the variance of the offspring counts (\cref{tab:e3var}) is
+\EThreeVarMultinomialFiveK{} for multinomial (theory 1.00), \EThreeVarResidualFiveK{} for residual
+(theory 0.44), \EThreeVarStratifiedFiveK{} for stratified and \EThreeVarSystematicFiveK{} for
+systematic resampling --- the last equal to the minimum possible for any unbiased scheme
+(\EThreeVarFloorFiveK, attained when every count is $\lfloor N w\rfloor$ or $\lceil N w\rceil$).
+This matches Hol, Schön and Gustafsson~\cite{hol2006}, who found stratified and residual
+resampling to have lower variance than multinomial, recommended systematic resampling for its
+quality and cost, and found the effect on the estimates ``not significant''; here too the lower
+resampling noise is real but small compared with the other sources of error, and systematic
+resampling is also the cheapest (\cref{tab:runtime}).
+
+\paragraph{ESS threshold.} Resampling when $\Neff$ falls below $0.1N$ to $1.0N$ (every step)
+changes the number of resampling steps per flight from \EThreeEssZeroPointOneResamples{} to
+\EThreeEssOnePointZeroResamples{}, but not the convergence (\EThreeEssZeroPointOneConv--%
+\EThreeEssOnePointZeroConv\,\%, all $p \ge 0.5$) or the tracking error.
+
+\paragraph{Roughening.} Roughening has by far the largest effect of the design choices
+(\cref{fig:e3design}, right). A small jitter, $K = 0.05$, raises convergence from
+\EThreeRoughZeroPointZeroZeroConv\,\% to \EThreeRoughZeroPointZeroFiveConv\,\% (McNemar: 24 runs
+gained, 1 lost, $p < 10^{-4}$) and also lowers the tracking RMSE (\EThreeRoughZeroPointZeroFiveTrack{}
+vs.\ \EThreeRoughZeroPointZeroZeroTrack\,m); $K = 0.1$ gives \EThreeRoughZeroPointOneZeroConv\,\%
+and $K = 0.2$ falls back to \EThreeRoughZeroPointTwoZeroConv\,\%. With $K = 0.05$, 5\,000 particles
+match 20\,000 particles without roughening at a quarter of the cost. Because the jitter is
+proportional to the spread of the cloud ($\sigma_j = K E_j N^{-1/4}$), roughening acts as an
+\emph{adaptive} process-noise inflation: tens of metres while the cloud is still wide, which keeps
+hypotheses near the truth alive between resamplings, and negligible once the cloud has collapsed.
+Too much of it blurs the information the measurements provide.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e3_design.pdf}
+  \caption{E3: convergence (top) and tracking RMSE (bottom) for the resampling scheme (left,
+    $N = 1\,000$ grey and 5\,000 blue), the ESS threshold (middle) and the roughening constant
+    (right); $N = 5\,000$ unless stated, $M = \EThreeRuns$, 95\,\% intervals.}\label{fig:e3design}
+\end{figure}
+
+\begin{table}[t]
+  \centering\small
+  \caption{E3: measured variance of the offspring counts, mean over particles
+    ($N_{\mathrm{eff}} \approx 0.4N$, 400 resamplings of one weight vector), with the closed forms
+    for multinomial and residual resampling and the floor/ceil lower bound.}\label{tab:e3var}
+  \input{../tables/e3_offspring_variance.tex}
+\end{table}

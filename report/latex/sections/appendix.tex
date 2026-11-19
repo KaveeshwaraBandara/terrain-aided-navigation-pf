@@ -36,3 +36,39 @@ SHA-256 checksums of every raster.
 2010--2014 and \textcopyright{} Airbus Defence and Space GmbH 2014--2018 provided under
 COPERNICUS by the European Union and ESA; all rights reserved. Data accessed through
 OpenTopography.
+
+\section{Additional result tables}\label{app:tables}
+
+\begin{table}[H]
+  \centering\scriptsize
+  \caption{E1: converged runs (\%, Wilson 95\,\% CI) and false locks (FL, \%) per region and
+    $\sigma_0$; $M = \EOneRuns$.}\label{tab:e1conv}
+  \resizebox{\textwidth}{!}{\input{../tables/e1_convergence.tex}}
+\end{table}
+
+\begin{table}[H]
+  \centering\small
+  \caption{E1: tracking RMSE (m, final 100\,s of converged runs, bootstrap 95\,\% CI). Values
+    for the EKF at large $\sigma_0$ rest on few converged runs.}\label{tab:e1track}
+  \input{../tables/e1_tracking.tex}
+\end{table}
+
+\begin{table}[H]
+  \centering\small
+  \caption{E1: paired comparisons of convergence on identical runs (McNemar exact test).
+    ``Only A'' / ``Only B'': runs in which only that filter converged.}\label{tab:e1tests}
+  \input{../tables/e1_tests.tex}
+\end{table}
+
+\begin{table}[H]
+  \centering\small
+  \caption{E3: paired comparisons against the defaults (systematic resampling, $\tau = 0.5$,
+    $K = 0$), McNemar exact test on convergence.}\label{tab:e3tests}
+  \input{../tables/e3_tests.tex}
+\end{table}
+
+\begin{table}[H]
+  \centering\scriptsize
+  \caption{E3: all design settings (hill country, $\sigma_0 = 1$\,km, $M = \EThreeRuns$).}\label{tab:e3summary}
+  \resizebox{\textwidth}{!}{\input{../tables/e3_summary.tex}}
+\end{table}

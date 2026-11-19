@@ -9,7 +9,7 @@ The navigation state at time step $k$ is
 the horizontal position $\pv_k$ (easting and northing in UTM zone~44N, metres) and the
 velocity bias $\bias_k$ of the inertial navigation system (INS, m/s). Given the INS
 outputs $\uu_{1:k}$ and the terrain-height measurements $z_{1:k}$, the goal is the filtering
-density $p(\xv_k \mid z_{1:k})$, computed by the Bayes recursion~\cite{arulampalam2002,sarkka2023}
+density $p(\xv_k \mid z_{1:k})$, computed by the Bayes recursion~\cite{arulampalam2002,sarkka2023,thrun2005}
 \begin{align}
   p(\xv_k \mid z_{1:k-1}) &= \int p(\xv_k \mid \xv_{k-1}, \uu_k)\,
                             p(\xv_{k-1} \mid z_{1:k-1})\, d\xv_{k-1}

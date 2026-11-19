@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 
 import numpy as np
 from matplotlib.figure import Figure
@@ -62,7 +63,8 @@ def runtime_ms() -> dict[int, float]:
     if not path.exists():
         return {}
     data = json.loads(path.read_text())["filters"]
-    return {v["n"]: v["median_ms"] for k, v in data.items() if k.startswith("pf_") and v["n"]}
+    # plain PF entries only ("pf_5000"), not variants such as "pf_student_t_5000"
+    return {v["n"]: v["median_ms"] for k, v in data.items() if re.fullmatch(r"pf_\d+", k)}
 
 
 def make(exp: str = "e3", quick: bool = False) -> None:
