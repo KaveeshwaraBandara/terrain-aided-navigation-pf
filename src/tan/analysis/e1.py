@@ -227,5 +227,26 @@ def make(exp: str = "e1", quick: bool = False) -> None:
         csv_rows=test_csv,
     )
     macros["EOneRuns"] = str(M)
+
+    # radar-altimeter ranges implied by the corridor altitude (A10): the flights are identical
+    # for every sigma0 (common random numbers), so one configuration per region suffices
+    rr_rows, rr_csv = [], []
+    for region in regions:
+        g = df[(df["region"] == region) & (df[SIGMA] == sigmas[0]) & (df["filter"] == ALL[0])]
+        r = g["radar_range_max_m"].to_numpy()
+        q50, q95, qmax = np.percentile(r, [50, 95, 100])
+        rr_rows.append([REGION_LABELS.get(region, region), fmt(q50, 0), fmt(q95, 0), fmt(qmax, 0)])
+        rr_csv.append([region, q50, q95, qmax, len(r)])
+        short = REGION_SHORT.get(region, region)
+        macros[macro_name("e1 radar", short, "median")] = fmt(q50, 0)
+        macros[macro_name("e1 radar", short, "max")] = fmt(qmax, 0)
+    out.table(
+        "radar_range",
+        ["Region", "Median (m)", "95th percentile (m)", "Largest (m)"],
+        rr_rows,
+        align="lrrr",
+        csv_header=["region", "median_max_range_m", "p95_max_range_m", "largest_m", "runs"],
+        csv_rows=rr_csv,
+    )
     out.macros(macros)
     print(f"[{exp}] figures, tables and macros written to {out.root}")

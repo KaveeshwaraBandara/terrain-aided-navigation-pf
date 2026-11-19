@@ -19,6 +19,7 @@ from .common import (
     macro_name,
     metric_table,
     pct,
+    yerr,
 )
 
 SCHEMES = ["multinomial", "systematic", "stratified", "residual"]
@@ -137,7 +138,7 @@ def make(exp: str = "e3", quick: bool = False) -> None:
         a2.errorbar(
             xs,
             y,
-            yerr=[y - [t["lo"] for t in tr], [t["hi"] for t in tr] - y],
+            yerr=yerr(y, [t["lo"] for t in tr], [t["hi"] for t in tr]),
             color=st["color"],
             marker="o",
             ms=3,
@@ -189,7 +190,7 @@ def make(exp: str = "e3", quick: bool = False) -> None:
                 axes[i, 0].errorbar(
                     np.arange(4) + off,
                     y,
-                    yerr=[y - lo, hi - y],
+                    yerr=yerr(y, lo, hi),
                     fmt="o",
                     ms=3,
                     capsize=2,

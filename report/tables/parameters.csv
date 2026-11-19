@@ -1,0 +1,25 @@
+group,key,value,unit
+Simulation,simulation.dt,1.0,s
+Simulation,simulation.duration,300.0,s
+Simulation,simulation.speed,40.0,m/s
+Simulation,simulation.weave_amplitude_deg,25.0,deg
+Simulation,simulation.weave_period_s,120.0,s
+Simulation,simulation.clearance_m,300.0,m
+Simulation,simulation.corridor_halfwidth_m,1000.0,m
+Simulation,simulation.flight.margin_sigma0,2000.0,m
+Sensors,simulation.ins.bias_sigma0,0.3,m/s
+Sensors,simulation.ins.bias_rw_sigma,0.002,m/s/$\sqrt{\mathrm{s}}$
+Sensors,simulation.ins.noise_sigma,0.05,m/s
+Sensors,simulation.baro_sigma,2.0,m
+Sensors,simulation.radar_sigma,3.0,m
+Sensors,simulation.outlier_sigma,100.0,m
+Prior,init.position_sigma,500.0,m
+Particle filter,particle_filter.n_particles,5000,
+Particle filter,particle_filter.resampling,systematic,
+Particle filter,particle_filter.ess_threshold,0.5,
+Particle filter,particle_filter.process_sigma_pos,2.0,m/step
+Particle filter,particle_filter.process_sigma_bias,0.002,m/s/step
+Particle filter,particle_filter.meas_sigma,3.6,m
+Particle filter,particle_filter.roughening,0.0,
+Evaluation,experiment.convergence_threshold_m,50.0,m
+Evaluation,experiment.tracking_window_s,100.0,s

@@ -18,6 +18,19 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — M2 complete: `make quick` runs end to end on the real regions
+
+- All seven experiments run in `--quick` mode (3 runs, 150 s flights) and every analysis writes
+  its figures/tables (under `results/<exp>_quick/report/`, never `report/`).
+- Smoke-level sanity only (3 runs, not evidence): on the hill-country DEM the EKF already fails
+  at σ₀ = 250 m in 2 of 3 runs while the PF converges, unlike on the synthetic map where the EKF
+  held up to 1 km; on the plains no filter converges reliably even at σ₀ = 100 m. Corridor
+  altitude gives radar ranges up to ≈ 0.7 km in the quick runs.
+- Bug found and fixed by the quick run: bootstrap bounds can exceed the point estimate by a
+  rounding error, which matplotlib rejects as negative error bars (clipped at 0 now).
+
+---
+
 ## 2026-11-19 — M1: real terrain downloaded, regions chosen by the pre-registered rule
 
 - OpenTopography key works. Survey: one COP90 request over Sri Lanka (33.9 MB). The rule picked

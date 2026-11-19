@@ -29,6 +29,7 @@ from .common import (
     pct,
     rate,
     regions_in,
+    yerr,
 )
 
 SIGMA = "init.position_sigma"
@@ -143,7 +144,7 @@ def make(exp: str = "e6", quick: bool = False) -> None:
                         ax.errorbar(
                             x,
                             y,
-                            yerr=[y - lo, hi - y],
+                            yerr=yerr(y, lo, hi),
                             fmt=mk,
                             ms=4,
                             capsize=2,

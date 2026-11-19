@@ -176,3 +176,10 @@ def ci(r: dict[str, float], percent: bool = True) -> str:
     if percent:
         return f"{pct(r['rate'])} [{pct(r['lo'])}, {pct(r['hi'])}]"
     return f"{fmt(r['rmse'])} [{fmt(r['lo'])}, {fmt(r['hi'])}]"
+
+
+def yerr(y, lo, hi) -> list[np.ndarray]:
+    """Error-bar lengths for matplotlib, clipped at 0 (a bootstrap bound can sit a rounding
+    error above the point estimate)."""
+    y, lo, hi = (np.asarray(a, dtype=float) for a in (y, lo, hi))
+    return [np.maximum(y - lo, 0.0), np.maximum(hi - y, 0.0)]
