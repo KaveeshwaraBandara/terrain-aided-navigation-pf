@@ -18,6 +18,27 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — Work order, and a correction to plan amendment A2
+
+- The OpenTopography key was not yet available, so M2 infrastructure and the M3 estimators
+  that need no real terrain (PCRB, RBPF, divergence monitor) were built and unit-tested on
+  synthetic terrain first. M1's download steps run as soon as the key is in `.env`.
+- **A2 correction.** The review claimed that averaging the terrain slope over *different*
+  random flights gives no valid bound. That was wrong for this design: flights are placed
+  uniformly at random, so given the initial guess the true start is distributed exactly as the
+  filters' prior N(guess, σ₀²), and the Tichavský recursion with the expectation over the
+  Monte Carlo ensemble bounds the ensemble MSE. Both versions are computed: the ensemble bound
+  (against E1/E5 ensemble RMSE) and the per-flight bound for fixed flight plans (a local bound
+  for the tracking phase).
+- Verified in tests: the PCRB recursion equals the Kalman covariance for a linear model and
+  equals the EKF covariance on planar terrain; the derived true process noise Q matches the
+  simulator's empirical noise covariance (within 6 %); the RBPF reproduces the exact Kalman
+  filter (position and bias) on planar terrain.
+- Note on the synthetic reference terrain: its *elevation range* is 1 970 m (overlapping
+  hills add up), although `synthetic.relief` is 600 m per hill.
+
+---
+
 ## 2026-11-19 — Pre-registered region-selection rule (written before the survey ran)
 
 Goal: three ~40 km × 40 km boxes of contrasting terrain, chosen by terrain statistics only

@@ -21,12 +21,15 @@ One filter step for particles {x_i, w_i}, i = 1..N:
 
 from __future__ import annotations
 
+from collections import deque
+
 import numpy as np
 from scipy.special import gammaln, logsumexp
+from scipy.stats import chi2
 
 from ..dem import DEM
 from .base import Estimator
-from .resampling import RESAMPLERS, effective_sample_size
+from .resampling import RESAMPLERS, effective_sample_size, systematic_m
 
 
 class ParticleFilter(Estimator):
@@ -45,6 +48,7 @@ class ParticleFilter(Estimator):
         snapshot_every: int = 0,
         likelihood: str = "gaussian",
         nu: float = 4.0,
+        monitor: dict | None = None,
         rng: np.random.Generator | None = None,
     ) -> None:
         if resampling not in RESAMPLERS:
@@ -65,6 +69,15 @@ class ParticleFilter(Estimator):
         self.nu = float(nu)
         self.rng = rng if rng is not None else np.random.default_rng()
 
+        # divergence monitor (Experiment 6), off by default
+        mon = dict(monitor or {})
+        self.monitor_on = bool(mon.get("enabled", False))
+        self.mon_window = int(mon.get("window", 10))
+        self.mon_fraction = float(mon.get("fraction", 0.5))
+        p_fa = float(mon.get("false_alarm_prob", 1e-3))
+        # windowed mean NIS of a consistent filter: Σ NIS ~ χ²_L  →  mean threshold χ²_L(1−p)/L
+        self.mon_threshold = float(chi2.ppf(1.0 - p_fa, self.mon_window) / self.mon_window)
+
         self.particles = np.zeros((self.n, 4))  # (N, 4) = [px, py, bx, by]
         self.log_weights = np.full(self.n, -np.log(self.n))
         self.history: dict[str, list] = self._empty_history()
@@ -74,14 +87,21 @@ class ParticleFilter(Estimator):
     # ------------------------------------------------------------------ provided
     def initialize(self, mean: np.ndarray, cov: np.ndarray) -> None:
         self.particles = self.rng.multivariate_normal(mean, cov, size=self.n)
+        self._reset_bookkeeping(mean, cov)
+
+    def _reset_bookkeeping(self, mean: np.ndarray, cov: np.ndarray) -> None:
         self.log_weights = np.full(self.n, -np.log(self.n))
         self.history = self._empty_history()
         self.snapshots = [(0, self.particles[:, :2].copy())] if self.snapshot_every else []
         self._k = 0
+        # measurement-free (dead-reckoning) belief, kept for the divergence monitor
+        self._dr_mean = np.array(mean, dtype=float)
+        self._dr_cov = np.array(cov, dtype=float)
+        self._nis_window: deque[float] = deque(maxlen=self.mon_window)
 
     @staticmethod
     def _empty_history() -> dict[str, list]:
-        return {"ess": [], "resampled": [], "log_evidence": [], "nis": []}
+        return {"ess": [], "resampled": [], "log_evidence": [], "nis": [], "alarms": []}
 
     @property
     def weights(self) -> np.ndarray:
@@ -91,8 +111,13 @@ class ParticleFilter(Estimator):
         return w / w.sum()
 
     def step(self, u: np.ndarray, dt: float, z: float) -> tuple[np.ndarray, np.ndarray]:
+        if self.monitor_on:
+            self._propagate_dr(u, dt)
         self.predict(u, dt)
         self.update(z)
+        alarm = self.monitor_on and self._check_monitor()
+        if alarm:
+            self._respread()
 
         ess = effective_sample_size(self.weights)
         resampled = ess < self.ess_threshold * self.n
@@ -108,6 +133,7 @@ class ParticleFilter(Estimator):
         self.history["resampled"].append(bool(resampled))
         self.history["log_evidence"].append(self._last_log_evidence)
         self.history["nis"].append(self._last_nis)
+        self.history["alarms"].append(bool(alarm))
         if self.snapshot_every and self._k % self.snapshot_every == 0:
             self.snapshots.append((self._k, self.particles[:, :2].copy()))
         return self.estimate()
@@ -195,6 +221,47 @@ class ParticleFilter(Estimator):
         d = self.particles - mean
         cov = (d * w[:, None]).T @ d
         return mean, cov
+
+    # ------------------------------------------------------------------ divergence monitor
+    def _propagate_dr(self, u: np.ndarray, dt: float) -> None:
+        """Dead-reckoning belief: the prior pushed through the motion model, no terrain."""
+        F = np.eye(4)
+        F[:2, 2:] = -dt * np.eye(2)
+        self._dr_mean[:2] += dt * (np.asarray(u, dtype=float) - self._dr_mean[2:])
+        q = np.array([self.sigma_pos**2] * 2 + [self.sigma_bias**2] * 2)
+        self._dr_cov = F @ self._dr_cov @ F.T + np.diag(q)
+
+    def _check_monitor(self) -> bool:
+        """Alarm when the mean NIS over the last ``window`` steps exceeds its χ² threshold.
+
+        A filter that tracks the right place sees innovations consistent with its own
+        predicted spread (NIS ≈ 1 on average). A falsely locked cloud is tight but sits on
+        terrain that does not match, so its innovations are persistently too large.
+        During acquisition the cloud is wide, S is large and the NIS stays small, so the
+        monitor is naturally quiet then. After an alarm the window restarts.
+        """
+        self._nis_window.append(self._last_nis)
+        if len(self._nis_window) < self.mon_window:
+            return False
+        if np.mean(self._nis_window) <= self.mon_threshold:
+            return False
+        self._nis_window.clear()
+        return True
+
+    def _respread(self) -> None:
+        """Replace the belief by the mixture (1−α)·posterior + α·dead-reckoning belief.
+
+        (1−α)N particles are drawn from the current weighted cloud (systematic
+        resampling) and αN fresh particles from the dead-reckoning Gaussian, which
+        contains the true state with its stated confidence whatever the terrain did.
+        All weights are reset to 1/N, so the particle set represents the mixture.
+        """
+        n_new = int(round(self.mon_fraction * self.n))
+        keep = self.n - n_new
+        kept = self.particles[systematic_m(self.weights, keep, self.rng)]
+        fresh = self.rng.multivariate_normal(self._dr_mean, self._dr_cov, size=n_new)
+        self.particles = np.vstack([kept, fresh])
+        self.log_weights = np.full(self.n, -np.log(self.n))
 
     def roughen(self) -> None:
         """Roughening (Gordon, Salmond and Smith, 1993, Sec. 4).

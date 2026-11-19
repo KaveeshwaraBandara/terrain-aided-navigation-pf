@@ -70,6 +70,12 @@ def systematic(w: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     return _invert(_cdf(w), pointers)
 
 
+def systematic_m(w: np.ndarray, m: int, rng: np.random.Generator) -> np.ndarray:
+    """Systematic resampling to ``m`` (≠ N) particles: pointers (u + j) / m, j = 0..m-1."""
+    pointers = (rng.random() + np.arange(int(m))) / int(m)
+    return _invert(_cdf(w), pointers)
+
+
 def stratified(w: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     """One independent uniform per stratum: (i + u_i) / N, u_i ~ U[0, 1).
 

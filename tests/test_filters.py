@@ -124,3 +124,60 @@ def test_pf_logs_evidence_and_nis(cfg, synthetic_dem, rng):
     assert np.all(np.isfinite(run.extras["log_evidence"]))
     # once locked on, the normalised innovation squared averages ≈ 1 (χ²₁ mean)
     assert 0.5 < np.mean(run.extras["nis"][-100:]) < 2.0
+
+
+def test_rbpf_matches_kalman_filter_on_planar_terrain(cfg, rng):
+    """A11: on a plane the RBPF must reproduce the exact Kalman filter, bias included."""
+    from tan.filters import RaoBlackwellizedPF
+
+    n, res = 668, 30.0
+    xs = np.arange(n) * res
+    xx, yy = np.meshgrid(xs, xs[::-1])
+    dem = DEM(0.05 * xx + 0.03 * yy + 200.0, x0=0.0, y0=float(xs[-1]), res=res)
+    sim = _sim(cfg, dem, rng, position_sigma=100.0)
+    kf = run_filter(ExtendedKalmanFilter(dem, **cfg["ekf"]), sim)
+    kw = {k: v for k, v in cfg["particle_filter"].items() if k != "n_particles"}
+    rb = run_filter(RaoBlackwellizedPF(dem, n_particles=5000, rng=rng, **kw), sim)
+    _require(rb)
+    kf_sd = np.sqrt(np.einsum("kii->ki", kf.cov))
+    z = np.abs(rb.est - kf.est) / kf_sd
+    assert z[:, :2].max() < 0.25
+    assert z[:, 2:].max() < 0.25
+    ratio = np.einsum("kii->ki", rb.cov) / np.einsum("kii->ki", kf.cov)
+    assert 0.75 < ratio.min() and ratio.max() < 1.35
+
+
+def _monitor_cfg(cfg, **mon):
+    return deep_update(
+        cfg,
+        {
+            "particle_filter": {
+                "n_particles": 3000,
+                "snapshot_every": 0,
+                "monitor": {"enabled": True, **mon},
+            }
+        },
+    )
+
+
+def test_monitor_stays_quiet_when_tracking(cfg, synthetic_dem, rng):
+    sim = _sim(cfg, synthetic_dem, rng, position_sigma=30.0)
+    run = run_filter(make_filter("particle_filter", _monitor_cfg(cfg), synthetic_dem, rng), sim)
+    assert run.extras["alarms"].sum() <= 1
+    assert run.error[-50:].mean() < 30.0
+
+
+def test_monitor_recovers_from_forced_false_lock(cfg, synthetic_dem, rng):
+    from tan.simulate import initial_belief
+
+    sim = _sim(cfg, synthetic_dem, rng, position_sigma=800.0)
+    pf = make_filter("particle_filter", _monitor_cfg(cfg, fraction=0.5), synthetic_dem, rng)
+    mean, cov = initial_belief(sim)
+    pf.initialize(mean, cov)
+    # force a confident, wrong cloud 2.5 km from the truth
+    wrong = sim.p0_true + np.array([2500.0, -1500.0])
+    pf.particles[:, :2] = wrong + rng.normal(0.0, 5.0, size=(pf.n, 2))
+    est = [pf.step(sim.v_ins[k], sim.dt, float(sim.z[k]))[0] for k in range(sim.n_steps)]
+    err = np.linalg.norm(np.array(est)[:, :2] - sim.truth, axis=1)
+    assert any(pf.history["alarms"])
+    assert err[-30:].mean() < 60.0

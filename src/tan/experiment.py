@@ -9,7 +9,13 @@ import numpy as np
 
 from .config import REPO_ROOT
 from .dem import DEM
-from .filters import DeadReckoning, Estimator, ExtendedKalmanFilter, ParticleFilter
+from .filters import (
+    DeadReckoning,
+    Estimator,
+    ExtendedKalmanFilter,
+    ParticleFilter,
+    RaoBlackwellizedPF,
+)
 from .metrics import position_error
 from .simulate import SimResult, filter_rng, initial_belief, run_streams, simulate
 
@@ -33,6 +39,8 @@ def make_filter(name: str, cfg: dict[str, Any], dem: DEM, rng: np.random.Generat
         return ParticleFilter(dem, rng=rng, **cfg["particle_filter"])
     if name == "ekf":
         return ExtendedKalmanFilter(dem, **cfg["ekf"])
+    if name == "rbpf":
+        return RaoBlackwellizedPF(dem, rng=rng, **cfg["particle_filter"])
     raise ValueError(f"unknown filter '{name}'")
 
 
@@ -64,6 +72,7 @@ def run_filter(f: Estimator, sim: SimResult) -> FilterRun:
             "resampled": np.array(f.history["resampled"], dtype=bool),
             "log_evidence": np.array(f.history["log_evidence"]),
             "nis": np.array(f.history["nis"]),
+            "alarms": np.array(f.history["alarms"], dtype=bool),
             "snapshots": f.snapshots,
             "n_particles": f.n,
         }

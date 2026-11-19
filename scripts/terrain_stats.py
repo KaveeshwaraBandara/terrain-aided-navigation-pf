@@ -103,10 +103,10 @@ def main() -> None:
             rgb = ls.shade(
                 h,
                 cmap=ELEVATION_CMAP,
-                vert_exag=1.5,
+                vert_exag=2.0,
                 dx=dem.res,
                 dy=dem.res,
-                blend_mode="soft",
+                blend_mode="overlay",
                 vmin=float(h.min()),
                 vmax=float(h.max()),
             )
