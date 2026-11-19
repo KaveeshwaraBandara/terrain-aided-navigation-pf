@@ -94,12 +94,26 @@ def _fmt(v: Any) -> str:
     return str(v).replace("/", "-").replace(" ", "")
 
 
+SYNTH_DEV = {"synthetic.size_m": 40000.0, "synthetic.n_hills": 240}
+
+
 def load_experiment(name: str) -> dict[str, Any]:
-    path = EXPERIMENTS_DIR / f"{name}.yaml"
+    """Experiment spec from YAML. ``<name>@synth`` is a development variant that runs the
+    same experiment on the 40 km synthetic map (results kept apart, never in report/)."""
+    base, _, tag = name.partition("@")
+    path = EXPERIMENTS_DIR / f"{base}.yaml"
     if not path.exists():
         raise FileNotFoundError(f"no experiment definition {path}")
     spec = load_yaml(path)
-    spec.setdefault("name", name)
+    spec["name"] = name
+    if tag == "synth":
+        spec["regions"] = ["synthetic"]
+        spec["set"] = {**(spec.get("set") or {}), **SYNTH_DEV}
+        for sub in (spec.get("studies") or {}).values():
+            if sub and "regions" in sub:
+                sub["regions"] = ["synthetic"]
+    elif tag:
+        raise ValueError(f"unknown experiment tag '@{tag}'")
     return spec
 
 
@@ -408,7 +422,9 @@ def load_runs(name: str, study: str, config_id: str, keys: list[str], quick: boo
         with np.load(p) as z:
             for k in keys:
                 out[k].append(z[k])
-    return {k: np.stack(v) if v else np.empty(0) for k, v in out.items()}
+    res = {k: np.stack(v) if v else np.empty(0) for k, v in out.items()}
+    res["_run"] = np.array([int(p.stem.split("_")[1]) for p in files], dtype=int)
+    return res
 
 
 def unpack_cov(upper: np.ndarray) -> np.ndarray:

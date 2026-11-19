@@ -19,7 +19,7 @@ EXPERIMENTS = ["e1", "e2", "e3", "e4", "e5", "e6", "e7", "visuals"]
 
 
 def run(exp: str, analysis: str, quick: bool) -> None:
-    mod = importlib.import_module(f"tan.analysis.{analysis}")
+    mod = importlib.import_module(f"tan.analysis.{analysis.split('@')[0]}")
     mod.make(exp=exp, quick=quick)
 
 

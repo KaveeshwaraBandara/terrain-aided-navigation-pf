@@ -41,8 +41,8 @@ class Output:
 
     @property
     def root(self) -> Path:
-        if self.quick:
-            return results_dir(self.exp, True) / "report"
+        if self.quick or "@" in self.exp:  # smoke / development runs never touch report/
+            return results_dir(self.exp, self.quick) / "report"
         return REPO_ROOT / "report"
 
     def figure(self, name: str) -> Path:
@@ -121,3 +121,58 @@ __all__ = [
     "regions_in",
     "series",
 ]
+
+
+# ---------------------------------------------------------------------- plotting helpers
+def axes_style(ax) -> None:
+    from ..plotting import GRID
+
+    ax.spines[["top", "right"]].set_visible(False)
+    ax.grid(True, color=GRID, lw=0.6)
+    ax.set_axisbelow(True)
+
+
+def metric_table(
+    df: pd.DataFrame, by: list[str], rng: np.random.Generator
+) -> dict[tuple, dict[str, dict[str, float]]]:
+    """Convergence / false-lock rates (Wilson) and tracking + overall RMSE (bootstrap)
+    for every group of ``by`` columns."""
+    out = {}
+    for key, g in df.groupby(by):
+        key = key if isinstance(key, tuple) else (key,)
+        out[key] = {
+            "conv": rate(g, "converged"),
+            "fl": rate(g, "false_lock"),
+            "track": pooled_rmse(g.loc[g["converged"], "tracking_mse_m2"].to_numpy(), rng),
+            "rmse": pooled_rmse(g["mse_m2"].to_numpy(), rng),
+        }
+    return out
+
+
+def plot_vs(ax, xs, filters, stats, key: str, xkey=lambda x, f: (x, f), percent=None) -> None:
+    """Draw one metric (``conv``/``fl`` as %, ``track``/``rmse`` in m) against ``xs`` for
+    each filter, with its 95 % band. ``stats[xkey(x, f)][key]`` holds the numbers."""
+    from ..plotting import style_of
+
+    percent = key in ("conv", "fl") if percent is None else percent
+    for f in filters:
+        st = style_of(f)
+        vals = [stats.get(xkey(x, f), {}).get(key) for x in xs]
+        if not any(v is not None for v in vals):
+            continue
+        name = "rate" if percent else "rmse"
+        y = np.array([np.nan if v is None else v[name] for v in vals], dtype=float)
+        lo = np.array([np.nan if v is None else v["lo"] for v in vals], dtype=float)
+        hi = np.array([np.nan if v is None else v["hi"] for v in vals], dtype=float)
+        scale = 100.0 if percent else 1.0
+        ax.fill_between(xs, scale * lo, scale * hi, color=st["color"], alpha=0.15, lw=0)
+        ax.plot(xs, scale * y, color=st["color"], ls=st["ls"], marker="o", ms=3, label=st["label"])
+    if percent:
+        ax.set_ylim(-3, 103)
+
+
+def ci(r: dict[str, float], percent: bool = True) -> str:
+    """'97 [94, 99]' for a rate (``percent``) or '12.3 [10.1, 15.0]' for an RMSE."""
+    if percent:
+        return f"{pct(r['rate'])} [{pct(r['lo'])}, {pct(r['hi'])}]"
+    return f"{fmt(r['rmse'])} [{fmt(r['lo'])}, {fmt(r['hi'])}]"

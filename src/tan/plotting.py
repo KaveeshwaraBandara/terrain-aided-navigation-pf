@@ -24,7 +24,7 @@ INK = "#0b0b0b"
 MUTED = "#52514e"
 GRID = "#e4e3df"
 _BLUE, _ORANGE, _AQUA, _VIOLET = "#2a78d6", "#eb6834", "#1baf7a", "#6250d6"
-_MAGENTA, _YELLOW, _GREEN = "#e87ba4", "#eda100", "#008300"
+_MAGENTA, _YELLOW, _GREEN, _RED = "#e87ba4", "#eda100", "#008300", "#e34948"
 COLORS = {
     "particle_filter": _BLUE,
     "pf_5000": _BLUE,
@@ -34,6 +34,11 @@ COLORS = {
     "rbpf": _MAGENTA,
     "pf_monitor": _YELLOW,
     "pf_student_t": _GREEN,
+    # E4 remedies: σ_z inflation is a parameter of the same PF (blue, new line styles);
+    # the offset-state PF is a different estimator (palette slot 8)
+    "pf_sz_x2": _BLUE,
+    "pf_sz_x4": _BLUE,
+    "pf_hbias": _RED,
 }
 LINESTYLES = {
     "particle_filter": "-",
@@ -44,6 +49,9 @@ LINESTYLES = {
     "rbpf": (0, (5, 1, 1, 1)),
     "pf_monitor": (0, (3, 1)),
     "pf_student_t": (0, (1, 1)),
+    "pf_sz_x2": (0, (4, 2)),
+    "pf_sz_x4": (0, (1, 1.5)),
+    "pf_hbias": "-.",
 }
 LABELS = {
     "particle_filter": "Particle filter",
@@ -54,6 +62,9 @@ LABELS = {
     "rbpf": "RBPF",
     "pf_monitor": "PF + divergence monitor",
     "pf_student_t": "PF, Student-t likelihood",
+    "pf_sz_x2": "PF, σ_z × 2",
+    "pf_sz_x4": "PF, σ_z × 4",
+    "pf_hbias": "PF + offset state",
 }
 ELEVATION_CMAP = LinearSegmentedColormap.from_list("elev", ["#f6f1e7", "#c9a77c", "#5b3a1e"])
 

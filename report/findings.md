@@ -18,6 +18,32 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — Experiment design decisions, fixed before any real-terrain run
+
+- **Definitions** (A5): converged = error < 50 m throughout at least the final 100 s;
+  false lock = final error > 200 m with 2σ radius < 50 m. A run can be neither (late or
+  incomplete acquisition, or an excursion > 50 m while crossing flat ground). On a 200 s smoke
+  run on synthetic terrain, most PF runs counted as "not converged" ended with 5–12 m error:
+  "not converged" does not mean "lost", and the report must say so.
+- **E4** runs on the hill-country and Kandy regions only: a robustness test needs a nominal
+  filter that works; the flat region is covered by E1/E2.
+- **E4 remedies**: σ_z inflated ×2 (7.2 m) and ×4 (14.4 m), and the offset-state PF (prior std
+  20 m on the offset). Map-error field std 2.4 m = absolute LE90 4 m / 1.645 (Gaussian
+  assumption); correlation length 1 km is an assumption.
+- **E6 selection rule** (dev seeds, seed root 1000): among window L ∈ {5, 10, 20} and
+  per-window false-alarm probability p ∈ {0.01, 0.001}, choose the highest pooled convergence
+  rate at σ₀ = 2000 m among settings whose false-alarm rate at σ₀ = 250 m (runs with ≥ 1
+  alarm) is ≤ 5 %; ties → longer window. Re-spread fraction fixed at 0.5. The chosen setting is
+  then evaluated once on the main seeds (M = 300).
+- **Illustrative run for the visuals**: the lowest-index E1 hill-country run at σ₀ = 2000 m
+  where PF (N = 20 000) converged with convergence time ≥ 60 s and the EKF did not.
+- **Colours**: one validated colour per estimator everywhere; σ_z-inflated PFs reuse PF blue
+  with other line styles (same estimator, other parameter). The EKF is omitted from the E4
+  map-error *figure* (kept in its table) because its orange and the offset-state PF's red fail
+  the colour-separation check (ΔE 7.1 < 15).
+
+---
+
 ## 2026-11-19 — Work order, and a correction to plan amendment A2
 
 - The OpenTopography key was not yet available, so M2 infrastructure and the M3 estimators
