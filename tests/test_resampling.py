@@ -39,6 +39,27 @@ def test_uniform_weights_keep_every_particle(scheme, todo, rng):
 
 
 @pytest.mark.parametrize("scheme", SCHEMES)
+def test_zero_weight_particles_never_selected(scheme, todo, rng):
+    w = rng.random(1000)
+    w[::3] = 0.0
+    w /= w.sum()
+    for _ in range(20):
+        idx = todo(RESAMPLERS[scheme], w, rng)
+        assert np.all(w[idx] > 0)
+
+
+def test_systematic_offspring_is_floor_or_ceil(todo, rng):
+    """Evenly spaced pointers → particle i gets floor(N w_i) or ceil(N w_i) copies."""
+    n = 1000
+    w = rng.random(n) ** 3
+    w /= w.sum()
+    for _ in range(20):
+        counts = np.bincount(todo(RESAMPLERS["systematic"], w, rng), minlength=n)
+        assert np.all(counts >= np.floor(n * w) - 1e-9)
+        assert np.all(counts <= np.ceil(n * w) + 1e-9)
+
+
+@pytest.mark.parametrize("scheme", SCHEMES)
 def test_unbiased_offspring_counts(scheme, todo, rng):
     w = np.array([0.5, 0.3, 0.15, 0.05])
     n_draws = 2000

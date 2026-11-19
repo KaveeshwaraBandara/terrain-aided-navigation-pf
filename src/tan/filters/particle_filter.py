@@ -1,8 +1,8 @@
 """Sequential importance resampling (SIR) particle filter for terrain-aided navigation.
 
-Main contribution of the project. The bookkeeping (initialisation, weight
-normalisation, the resampling decision, logging) is written; the estimation
-maths is left as TODOs for you to implement and derive in the report.
+Main contribution of the project. This is the bootstrap filter of Gordon, Salmond
+and Smith (1993): the motion model is the proposal, so the importance weight of a
+particle is just the measurement likelihood.
 
 Models (state x = [px, py, bx, by]):
 
@@ -10,11 +10,19 @@ Models (state x = [px, py, bx, by]):
                  b_k = b_{k-1} + w_b,                         w_b ~ N(0, σ_b² I)
     measurement  z_k = h(p_k) + v_k,                          v_k ~ N(0, σ_z²)
                  h(p) = DEM height at p (bilinear)
+
+One filter step for particles {x_i, w_i}, i = 1..N:
+
+    1. predict    x_i ~ p(x_k | x_i, u_k)                (sample the motion model)
+    2. update     w_i ∝ w_i · p(z_k | x_i)              (weight by the terrain likelihood)
+    3. resample   if N_eff = 1 / Σ w_i² < threshold · N  (fight weight degeneracy)
+    4. estimate   x̂ = Σ w_i x_i,  P = Σ w_i (x_i − x̂)(x_i − x̂)ᵀ
 """
 
 from __future__ import annotations
 
 import numpy as np
+from scipy.special import logsumexp
 
 from ..dem import DEM
 from .base import Estimator
@@ -92,28 +100,68 @@ class ParticleFilter(Estimator):
             self.snapshots.append((self._k, self.particles[:, :2].copy()))
         return self.estimate()
 
-    # ------------------------------------------------------------------ TODO(you)
+    # ------------------------------------------------------------------ filter maths
     def predict(self, u: np.ndarray, dt: float) -> None:
-        """Propagate every particle through the motion model (vectorised, no Python loop).
+        """Sample every particle from the motion model p(x_k | x_{k-1}, u_k).
 
-        Use ``self.rng`` for the process noise and ``self.sigma_pos`` / ``self.sigma_bias``.
+        Each particle carries its own bias hypothesis b_i, so it integrates the INS
+        velocity corrected by *its own* bias. Particles whose bias is wrong drift
+        away from the terrain that matches the measurements and lose weight; that
+        is how the filter estimates the bias without measuring it directly.
         """
-        raise NotImplementedError("ParticleFilter.predict — implement the motion model")
+        n = self.n
+        bias = self.particles[:, 2:]  # b_{k-1}, read before the bias is perturbed below
+        self.particles[:, :2] += dt * (np.asarray(u, dtype=float) - bias) + self.rng.normal(
+            0.0, self.sigma_pos, size=(n, 2)
+        )
+        self.particles[:, 2:] += self.rng.normal(0.0, self.sigma_bias, size=(n, 2))
 
     def update(self, z: float) -> None:
-        """Re-weight particles by the terrain likelihood p(z | p_i).
+        """Re-weight particles by the terrain likelihood p(z | p_i) = N(z; h(p_i), σ_z²).
 
-        Work in log space: ``self.log_weights += log N(z; h(p_i), σ_z²)``, with
-        h(p_i) from ``self.dem.height``. Normalisation is done by :attr:`weights`.
-        Later experiment: a Student-t likelihood for radar-altimeter outliers.
+        Log space: log w_i += -½ ((z − h(p_i)) / σ_z)². The Gaussian's normalising
+        constant is the same for every particle, so it cancels on normalisation and
+        is dropped. Working with logs avoids underflow: one 50 m misfit at σ_z = 3.6 m
+        is a factor e^-96, which is already near the limit of float64.
+
+        Particles outside the DEM get zero weight: the map is chosen to cover the
+        mission area, so a hypothesis off the map is impossible. (Letting them read
+        the clamped edge height would compare the measurement with fake flat
+        terrain.) If every surviving particle is off the map, the clamped
+        likelihood is used instead so the filter cannot collapse to all-zero weights.
         """
-        raise NotImplementedError("ParticleFilter.update — implement the likelihood weighting")
+        px, py = self.particles[:, 0], self.particles[:, 1]
+        h = self.dem.height(px, py)
+        r = (float(z) - h) / self.meas_sigma
+        loglik = -0.5 * r * r
+
+        new = self.log_weights + np.where(self.dem.contains(px, py), loglik, -np.inf)
+        if not np.isfinite(logsumexp(new)):
+            new = self.log_weights + loglik
+        self.log_weights = new - logsumexp(new)  # keep Σ w_i = 1 in log form
 
     def estimate(self) -> tuple[np.ndarray, np.ndarray]:
-        """Weighted mean (4,) and weighted covariance (4, 4) of the particle cloud."""
-        raise NotImplementedError("ParticleFilter.estimate — implement the weighted mean/cov")
+        """Weighted mean (MMSE estimate) and weighted covariance of the particle cloud.
+
+        When the posterior is multimodal (several places match the measured terrain
+        profile) the mean can sit between the modes, where there are no particles.
+        That is expected behaviour, not a bug, and is worth showing in the report.
+        """
+        w = self.weights
+        mean = w @ self.particles
+        d = self.particles - mean
+        cov = (d * w[:, None]).T @ d
+        return mean, cov
 
     def roughen(self) -> None:
-        """Optional (Gordon et al., 1993): add small jitter after resampling to fight
-        sample impoverishment. Scale by ``self.roughening``."""
-        raise NotImplementedError("ParticleFilter.roughen — optional")
+        """Roughening (Gordon, Salmond and Smith, 1993, Sec. 4).
+
+        After resampling, many particles are exact copies. Add independent jitter
+        with per-component std σ_j = K · E_j · N^(−1/d), where E_j is the spread
+        (max − min) of component j, d = 4 is the state dimension and
+        K = ``self.roughening`` (the paper used K = 0.2).
+        """
+        d = self.particles.shape[1]
+        spread = np.ptp(self.particles, axis=0)
+        sigma = self.roughening * spread * self.n ** (-1.0 / d)
+        self.particles += self.rng.normal(0.0, 1.0, size=self.particles.shape) * sigma

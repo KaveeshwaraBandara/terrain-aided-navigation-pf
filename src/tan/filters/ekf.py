@@ -41,12 +41,40 @@ class ExtendedKalmanFilter(Estimator):
     def estimate(self) -> tuple[np.ndarray, np.ndarray]:
         return self.x.copy(), self.P.copy()
 
-    # ------------------------------------------------------------------ TODO(you)
+    # ------------------------------------------------------------------ filter maths
     def predict(self, u: np.ndarray, dt: float) -> None:
-        """x⁻ = F x + G u,  P⁻ = F P Fᵀ + Q."""
-        raise NotImplementedError("ExtendedKalmanFilter.predict")
+        """x⁻ = F x + G u,  P⁻ = F P Fᵀ + Q.
+
+        The motion model is linear, so this half of the EKF is an exact Kalman
+        prediction. Only the measurement update needs linearising.
+        """
+        F = np.eye(4)
+        F[:2, 2:] = -dt * np.eye(2)
+        self.x[:2] += dt * (np.asarray(u, dtype=float) - self.x[2:])
+        self.P = F @ self.P @ F.T + self.Q
 
     def update(self, z: float) -> None:
-        """Linearise h with ``self.dem.gradient`` at the predicted position, then the usual
-        K = P⁻Hᵀ(HP⁻Hᵀ + R)⁻¹ update. Use the Joseph form for P to keep it symmetric PSD."""
-        raise NotImplementedError("ExtendedKalmanFilter.update")
+        """Linearised measurement update.
+
+            H = [∂h/∂px, ∂h/∂py, 0, 0] at x⁻     (local terrain slope from the DEM)
+            y = z − h(x⁻)                          (innovation)
+            S = H P⁻ Hᵀ + R,   K = P⁻ Hᵀ / S
+            x⁺ = x⁻ + K y
+            P⁺ = (I − KH) P⁻ (I − KH)ᵀ + K R Kᵀ   (Joseph form: stays symmetric PSD)
+
+        The weakness is H: it is the slope over one 30 m DEM cell, but the position
+        uncertainty can be hundreds of metres. Over that range the terrain is nothing
+        like a plane, so a large innovation gets "explained" by the wrong slope.
+        """
+        px, py = self.x[0], self.x[1]
+        h = float(self.dem.height(px, py))
+        gx, gy = self.dem.gradient(px, py)
+        H = np.array([[float(gx), float(gy), 0.0, 0.0]])
+
+        S = float((H @ self.P @ H.T)[0, 0]) + self.R
+        K = (self.P @ H.T) / S  # (4, 1)
+        self.x = self.x + K[:, 0] * (float(z) - h)
+
+        A = np.eye(4) - K @ H
+        self.P = A @ self.P @ A.T + self.R * (K @ K.T)
+        self.P = 0.5 * (self.P + self.P.T)  # remove round-off asymmetry

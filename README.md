@@ -28,8 +28,8 @@ State `x = [px, py, bx, by]` — position (m, UTM 44N) and INS velocity bias (m/
 
 | Estimator | Role | Status |
 |---|---|---|
-| `ParticleFilter` | SIR particle filter — main contribution | TODO |
-| `ExtendedKalmanFilter` | Linearised baseline (DEM slope as Jacobian) | TODO |
+| `ParticleFilter` | SIR (bootstrap) particle filter — main contribution | done |
+| `ExtendedKalmanFilter` | Linearised baseline (DEM slope as Jacobian) | done |
 | `DeadReckoning` | INS only, no terrain — lower bar | done |
 
 ## Study regions
@@ -53,7 +53,7 @@ src/tan/
   metrics.py        RMSE, NEES, convergence time
   plotting.py       report figures (trajectories, error, ESS, particle snapshots)
 scripts/            download_dem.py, run_experiment.py
-tests/              pytest suite — filter tests skip until the TODOs are implemented
+tests/              pytest suite — incl. PF vs exact Kalman filter on planar terrain
 report/             report outline and figures
 ```
 
@@ -64,7 +64,7 @@ Requires Python ≥ 3.10 (Ubuntu 24.04 ships 3.12; install `python3-venv` if `ve
 ```bash
 make setup                 # creates .venv and installs the package + dev tools
 source .venv/bin/activate
-make test                  # passes, with the filter TODOs reported as skipped
+make test                  # 35 tests, ~3 s
 make run                   # synthetic terrain → results/<timestamp>_synthetic/
 ```
 
@@ -84,9 +84,9 @@ python scripts/run_experiment.py --set particle_filter.n_particles=1000 init.pos
 
 ## Roadmap
 
-- [ ] Resampling: ESS, multinomial, systematic, stratified, residual (`filters/resampling.py`)
-- [ ] Particle filter: predict, update, estimate (`filters/particle_filter.py`)
-- [ ] EKF baseline: predict, update (`filters/ekf.py`)
+- [x] Resampling: ESS, multinomial, systematic, stratified, residual (`filters/resampling.py`)
+- [x] Particle filter: predict, update, estimate, roughening (`filters/particle_filter.py`)
+- [x] EKF baseline: predict, update (`filters/ekf.py`)
 - [ ] Download the three regions and sanity-check the hillshades
 - [ ] Experiment 1 — PF vs EKF vs dead reckoning, increasing initial uncertainty
 - [ ] Experiment 2 — hill country vs rolling vs flat terrain
@@ -94,7 +94,7 @@ python scripts/run_experiment.py --set particle_filter.n_particles=1000 init.pos
 - [ ] Experiment 4 — robustness: altimeter outliers (Student-t likelihood), canopy bias
 - [ ] Experiment 5 — Monte Carlo consistency (NEES), particle-cloud figures
 - [ ] Stretch — Rao-Blackwellised PF (Kalman filter per particle for the bias states)
-- [ ] Report (`report/outline.md`)
+- [ ] Report (`report/outline.md`; running results in `report/findings.md`)
 
 ## Data attribution
 
