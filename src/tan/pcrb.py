@@ -64,7 +64,7 @@ def true_noise(sim_cfg: dict[str, Any]) -> tuple[np.ndarray, float]:
 
 def slope_outer(dem: DEM, truth: np.ndarray) -> np.ndarray:
     """∇h ∇hᵀ at true positions. ``truth`` (..., K, 2) → (..., K, 2, 2)."""
-    gx, gy = dem.gradient(truth[..., 0], truth[..., 1])
+    gx, gy = dem.bilinear_gradient(truth[..., 0], truth[..., 1])  # gradient of the true h
     g = np.stack([gx, gy], axis=-1)
     return g[..., :, None] * g[..., None, :]
 

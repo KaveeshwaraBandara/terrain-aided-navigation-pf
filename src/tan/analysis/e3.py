@@ -147,12 +147,12 @@ def make(exp: str = "e3", quick: bool = False) -> None:
             capsize=2,
             lw=1.2,
         )
-        for x, yy, n in zip(xs, y, Ns, strict=True):
+        for i, (x, yy, n) in enumerate(zip(xs, y, Ns, strict=True)):
             a2.annotate(
                 f"{n:,}".replace(",", " "),
                 (x, yy),
                 textcoords="offset points",
-                xytext=(3, 4),
+                xytext=(3, 4 if i % 2 == 0 else -10),  # alternate to avoid overlaps
                 fontsize=7,
                 color=MUTED,
             )
@@ -353,6 +353,14 @@ def make(exp: str = "e3", quick: bool = False) -> None:
         [x for x in sorted(ro["particle_filter.roughening"].unique()) if x != 0.0],
         "roughening",
     )
+    ess_p = [r[5] for r in tcsv if r[0] == "ESS threshold"]
+    if ess_p:
+        macros["EThreeEssMinP"] = fmt(min(ess_p), 2)
+    for r in tcsv:
+        if r[0] == "roughening":
+            macros[macro_name("e3 rough p", fmt(float(r[2]), 2).replace(".", " point "))] = (
+                "<10^{-4}" if r[5] < 1e-4 else fmt(r[5], 2)
+            )
     res_p = [r[5] for r in tcsv if str(r[0]).startswith("resampling")]
     if res_p:
         macros["EThreeResMinP"] = fmt(min(res_p), 2)

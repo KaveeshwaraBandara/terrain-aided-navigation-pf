@@ -22,7 +22,12 @@ from .common import (
 )
 
 STUDIES = {
-    "outliers": ("simulation.outlier_prob", "Outlier probability per measurement", 100.0, "\\%"),
+    "outliers": (
+        "simulation.outlier_prob",
+        "Outlier probability per measurement (%)",
+        100.0,
+        "\\%",
+    ),
     "map_error": ("simulation.map_error.offset_m", "Constant map / altimeter offset (m)", 1.0, ""),
     "ins_grade": ("simulation.ins.bias_sigma0", "Initial INS bias std (m/s)", 1.0, ""),
 }

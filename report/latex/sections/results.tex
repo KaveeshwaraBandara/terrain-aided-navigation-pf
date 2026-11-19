@@ -54,8 +54,9 @@ $M = \EOneRuns$ per cell (5\,400 flights in total).
   \centering
   \includegraphics[width=\textwidth]{e1_rates.pdf}
   \caption{E1: share of converged (top) and falsely locked (bottom) runs against the initial
-    position uncertainty, $M = \EOneRuns$ per point, Wilson 95\,\% bands. Dead reckoning never
-    converges and is omitted.}\label{fig:e1rates}
+    position uncertainty, $M = \EOneRuns$ per point, Wilson 95\,\% bands. Dead reckoning
+    (converged in at most \EOneDrMaxConv\,\% of the runs of any cell, when the initial error happened
+    to be small) is omitted.}\label{fig:e1rates}
 \end{figure}
 
 \begin{figure}[t]
@@ -73,18 +74,24 @@ falsely locks in \EOneHillSOneZeroZeroEkfFl\,\%; at 500\,m it converges in
 particle filters converge in \EOneHillSFiveZeroZeroPfFiveZeroZeroZeroConv\,\% ($N=5\,000$) and
 \EOneHillSFiveZeroZeroPfTwoZeroZeroZeroZeroConv\,\% ($N=20\,000$) of the same runs. Paired over the
 runs, the PF converges significantly more often than the EKF in every one of the 18 cells
-(McNemar, all $p < 10^{-10}$; \cref{tab:e1tests} in the appendix). This is a much earlier failure
-than on the smooth synthetic terrain, where the EKF had held up to $\sigma_0 = 1$\,km during
-development: the real DEM's slope changes within a few cells, so the one-cell Jacobian is already
-wrong when the error is a few tens of metres. The Kandy region behaves almost identically.
+(McNemar, all $p < 10^{\EOneEkfPfMaxPExp}$; \cref{tab:e1tests} in the appendix). The same
+experiment on the smooth synthetic terrain used during development ($M = \EOneSynthRuns$, same
+protocol) shows that real terrain makes the linearisation fail earlier: there the EKF converged in
+\EOneSynthSFiveZeroZeroEkfConv\,\% of the runs at $\sigma_0 = 500$\,m and
+\EOneSynthSOneZeroZeroZeroEkfConv\,\% at 1\,km, against \EOneHillSFiveZeroZeroEkfConv{} and
+\EOneHillSOneZeroZeroZeroEkfConv\,\% on the real hill country. The real DEM's slope changes within a
+few cells, so the one-cell Jacobian is already wrong when the error is a few tens of metres; the
+smooth synthetic hills tolerate larger errors, although the EKF also degrades there. The Kandy
+region behaves almost identically to the hill country.
 
 \Cref{fig:e1time} shows how the EKF fails. Its median error \emph{grows} during the flight and
 ends well above the dead-reckoning error on both hilly regions: corrections computed from the
 wrong slope also corrupt the bias estimate, so the EKF drifts faster than the uncorrected INS.
-A linearised terrain filter is worse than no terrain aiding at all once its linearisation is
-invalid.
+This EKF --- with an unconstrained bias state and no innovation gating --- is then worse than no
+terrain aiding at all. A gated EKF would fail less destructively; that variant was not tested.
 
-The particle filter's limit is different. Its error drops within 10--20\,s to a few metres, and
+The particle filter's limit is different. Its median error drops within seconds to the tracking
+level (\cref{fig:e1time}), and
 it degrades gracefully with $\sigma_0$: at 2\,km the filter with 20\,000 particles still converges in
 \EOneHillSTwoZeroZeroZeroPfTwoZeroZeroZeroZeroConv\,\% of the runs, the one with 5\,000 in
 \EOneHillSTwoZeroZeroZeroPfFiveZeroZeroZeroConv\,\%. Its failures are almost all false locks
@@ -98,9 +105,10 @@ $\sigma_0 = 100$\,m the 20\,000-particle PF converges in only
 \EOnePlainsSOneZeroZeroPfTwoZeroZeroZeroZeroConv\,\% of the runs, and in
 \EOnePlainsSTwoZeroZeroZeroPfTwoZeroZeroZeroZeroConv\,\% at 2\,km. Yet it almost never locks
 falsely (\EOnePlainsSTwoZeroZeroZeroPfTwoZeroZeroZeroZeroFl\,\% at 2\,km): it knows that it does
-not know. Its covariance stays wide, and its median error still falls from 500\,m to about 25\,m
-within the first 100\,s, because even 3\,m of roughness is not zero information; most of its
-``non-converged'' runs end just above the 50\,m threshold rather than lost (\cref{sec:e2}). The
+not know. Its covariance stays wide, and its median error still falls from 500\,m to the
+tracking level within the first 100\,s (\cref{fig:e1time}), because even 3\,m of roughness is not
+zero information; most of its ``non-converged'' runs end with errors of a few tens of metres ---
+imprecise rather than lost (\cref{fig:e2scatter}). The
 EKF on the plains, by contrast, is falsely locked in \EOnePlainsSFiveZeroZeroEkfFl\,\% of the runs
 at $\sigma_0 = 500$\,m. In the tracking phase
 of converged runs the PF's RMSE is \EOneHillSFiveZeroZeroPfTwoZeroZeroZeroZeroTrack\,m (hill
@@ -123,20 +131,24 @@ along- and cross-track components.
   \centering
   \includegraphics[width=\textwidth]{e2_scatter.pdf}
   \caption{E2: RMS error over the final 100\,s of each flight against the roughness of the
-    terrain under that flight ($M = \ETwoRuns$ per region, $\sigma_0 = 500$\,m). Spearman rank
-    correlation with bootstrap 95\,\% CI over all flights.}\label{fig:e2scatter}
+    terrain under that flight ($M = \ETwoRuns$ per region, $\sigma_0 = 500$\,m). The titles give
+    the Spearman rank correlation pooled over all flights of the three regions (bootstrap 95\,\% CI
+    treating flights as independent); it is dominated by the differences between regions.}\label{fig:e2scatter}
 \end{figure}
 
-\Cref{fig:e2scatter} relates each flight's final error to the terrain it crossed. For the particle
-filter, rougher terrain means smaller error (Spearman $\rho = \ETwoRhoPfFiveZeroZeroZero$
-[$\ETwoRhoPfFiveZeroZeroZeroLo$, $\ETwoRhoPfFiveZeroZeroZeroHi$]). For the EKF the correlation has
-the \emph{opposite} sign ($\rho = \ETwoRhoEkf$ [$\ETwoRhoEkfLo$, $\ETwoRhoEkfHi$]): the same texture that informs
-the particle filter breaks the EKF's linearisation, so its failures concentrate on the most
-informative terrain. Within a single region the correlations are weak (PF $\rho$ between
-\ETwoPlainsPfFiveZeroZeroZeroRho{} and \ETwoKandyPfFiveZeroZeroZeroRho), i.e.\ most of the effect
-is between terrain types rather than between flights over the same type. Binned by the terrain
-information collected along the flight (\cref{fig:e2binned}), the PF's convergence rate rises
-from about one half on the least informative flights to over 90\,\% on the hills.
+\Cref{fig:e2scatter} relates each flight's final error to the terrain it crossed. Pooled over the
+three regions, rougher terrain goes with smaller error for the particle filter (Spearman
+$\rho = \ETwoRhoPfFiveZeroZeroZero$) and with \emph{larger} error for the EKF
+($\rho = +\ETwoRhoEkf$). The scatter shows three clusters, however, and these pooled correlations
+mostly compare terrain types: across terrain types, the texture that informs the particle filter
+breaks the EKF's linearisation. Within one region the per-flight relation is much weaker. For the
+PF it is negative and significant on the two hilly regions ($\rho = \ETwoHillPfFiveZeroZeroZeroRho$,
+$p = \ETwoHillPfFiveZeroZeroZeroRhoP$ on the hill country; $\rho = \ETwoKandyPfFiveZeroZeroZeroRho$,
+$p \ETwoKandyPfFiveZeroZeroZeroRhoP$ around Kandy) and absent on the plains
+($p = \ETwoPlainsPfFiveZeroZeroZeroRhoP$); for the EKF there is no consistent within-region relation
+($\rho$ = \ETwoHillEkfRho, \ETwoKandyEkfRho, \ETwoPlainsEkfRho; \cref{tab:e2}). Binned by the terrain
+information collected along the flight (\cref{fig:e2binned}), the convergence rate of both filters
+rises with the information.
 
 
 Decomposing the tracking error into along- and cross-track components (\cref{tab:e2}) shows no
@@ -196,19 +208,23 @@ resampling is also the cheapest (\cref{tab:runtime}).
 \paragraph{ESS threshold.} Resampling when $\Neff$ falls below $0.1N$ to $1.0N$ (every step)
 changes the number of resampling steps per flight from \EThreeEssZeroPointOneResamples{} to
 \EThreeEssOnePointZeroResamples{}, but not the convergence (\EThreeEssZeroPointOneConv--%
-\EThreeEssOnePointZeroConv\,\%, all $p \ge 0.5$) or the tracking error.
+\EThreeEssOnePointZeroConv\,\%, all $p \ge \EThreeEssMinP$) or the tracking error.
 
 \paragraph{Roughening.} Roughening has by far the largest effect of the design choices
 (\cref{fig:e3design}, right). A small jitter, $K = 0.05$, raises convergence from
 \EThreeRoughZeroPointZeroZeroConv\,\% to \EThreeRoughZeroPointZeroFiveConv\,\% (McNemar: \EThreeRoughGained{} runs
-gained, \EThreeRoughLost{} lost, $p < 10^{-4}$) and also lowers the tracking RMSE (\EThreeRoughZeroPointZeroFiveTrack{}
+gained, \EThreeRoughLost{} lost, $p \EThreeRoughPZeroPointZeroFive$) and also lowers the tracking RMSE (\EThreeRoughZeroPointZeroFiveTrack{}
 vs.\ \EThreeRoughZeroPointZeroZeroTrack\,m); $K = 0.1$ gives \EThreeRoughZeroPointOneZeroConv\,\%
-and $K = 0.2$ falls back to \EThreeRoughZeroPointTwoZeroConv\,\%. With $K = 0.05$, 5\,000 particles
-match 20\,000 particles without roughening at a quarter of the cost. Because the jitter is
-proportional to the spread of the cloud ($\sigma_j = K E_j N^{-1/4}$), roughening acts as an
-\emph{adaptive} process-noise inflation: tens of metres while the cloud is still wide, which keeps
-hypotheses near the truth alive between resamplings, and negligible once the cloud has collapsed.
-Too much of it blurs the information the measurements provide.
+and $K = 0.2$ \EThreeRoughZeroPointTwoZeroConv\,\% (not significantly different from $K = 0$,
+$p = \EThreeRoughPZeroPointTwoZero$), while the tracking RMSE keeps falling as $K$ grows
+(\EThreeRoughZeroPointTwoZeroTrack\,m at $K = 0.2$). With $K = 0.05$, 5\,000 particles match
+20\,000 particles without roughening (roughening adds one Gaussian draw per particle at each
+resampling; its cost was not benchmarked separately). Because the jitter is proportional to the
+spread of the cloud ($\sigma_j = K E_j N^{-1/4}$), roughening acts as an \emph{adaptive}
+process-noise inflation: tens of metres in position while the cloud is still wide, which keeps
+hypotheses near the truth alive between resamplings. It also jitters the bias samples, whose spread
+stays relevant after the position has collapsed; refreshing the nearly static bias against the
+impoverishment found in E7 is a plausible reason why the tracking error, too, improves with $K$.
 
 \begin{figure}[t]
   \centering
@@ -253,15 +269,18 @@ all once outliers are frequent.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\textwidth]{e4_map_error.pdf}
-  \caption{E4: map error --- a spatially correlated field (std 2.4\,m, correlation length 1\,km,
-    both assumptions derived from the handbook accuracy) plus a constant offset between the
-    measured and the mapped surface. Remedies: measurement std inflated $\times2$ and $\times4$,
-    and an extra state for the offset. $M = \EFourRuns$. The EKF is in \cref{tab:e4} only.}
+  \caption{E4: map error --- a spatially correlated field (std 2.4\,m from the handbook's
+    absolute accuracy under a Gaussian assumption; correlation length 1\,km, an assumption) plus a
+    constant offset between the measured and the mapped surface. Remedies: measurement std inflated
+    $\times2$ and $\times4$, and an extra state for the offset. $M = \EFourRuns$. The EKF is in
+    \cref{tab:e4map} only.}
   \label{fig:e4map}
 \end{figure}
 
-\paragraph{Map error.} A random map-error field of the size the Copernicus handbook implies is
-harmless (\EFourMapErrorHillZeroPfFiveZeroZeroZeroConv\,\% convergence; \cref{fig:e4map}). A
+\paragraph{Map error.} A random map-error field of the size the Copernicus handbook implies does
+not reduce convergence (\EFourMapErrorHillZeroPfFiveZeroZeroZeroConv\,\%; \cref{fig:e4map}), but it
+raises the tracking RMSE from \EFourOutliersHillZeroPfFiveZeroZeroZeroTrack{} to
+\EFourMapErrorHillZeroPfFiveZeroZeroZeroTrack\,m on the hill country. A
 \emph{constant} offset between the measured and the mapped height --- a barometric bias, or a radar
 that sees the ground under a canopy the surface model includes --- is not: the nominal filter
 converges in \EFourMapErrorHillFivePfFiveZeroZeroZeroConv\,\% of the runs at 5\,m,
@@ -303,7 +322,9 @@ simulation (\cref{sec:pcrb}).
   \centering
   \includegraphics[width=\textwidth]{e5_bound.pdf}
   \caption{E5: RMSE over all runs (thick) and over converged runs (thin) against the ensemble
-    PCRB (black), from the E1 runs ($M = \EOneRuns$).}\label{fig:e5bound}
+    PCRB (black), from the E1 runs ($M = \EOneRuns$). The thin curves are conditional on
+    convergence; on the plains, where the bound is comparable to the 50\,m convergence threshold,
+    this selection lets them dip below the bound. The unconditional (thick) curves never do.}\label{fig:e5bound}
 \end{figure}
 
 \paragraph{The bound and ambiguity.} The posterior Cramér--Rao bound is never violated: over all
@@ -325,31 +346,36 @@ capture.
   \centering
   \includegraphics[width=\textwidth]{e5_anees.pdf}
   \caption{E5: position ANEES over all runs (top) and over converged runs (bottom) at
-    $\sigma_0 = \EFiveAneesSigma$\,m, with the 95\,\% interval for a consistent filter (grey band;
-    $M = \EOneRuns$). Log scale.}\label{fig:e5anees}
+    $\sigma_0 = \EFiveAneesSigma$\,m, with the 95\,\% interval of a consistent filter at a single
+    time step (grey band; top: $M = \EOneRuns$ runs, bottom: the filter with the fewest converged
+    runs). Log scale.}\label{fig:e5anees}
 \end{figure}
 
-\paragraph{Consistency.} Over all runs the ANEES is meaningless --- up to $10^{15}$ --- because a
-falsely locked cloud is tight and far from the truth (\cref{fig:e5anees}, top). In the tracking
-window of converged runs the PF is consistent to slightly conservative: ANEES
-\EFiveHillSOneZeroZeroPfTwoZeroZeroZeroZeroAneesConv{} at $\sigma_0 = 100$\,m and
-\EFiveHillSFiveZeroZeroPfTwoZeroZeroZeroZeroAneesConv{} at 500\,m on the hill country, against a
-95\,\% interval of about [\EFiveAneesLo, \EFiveAneesHi], with
-\EFiveHillSFiveZeroZeroPfTwoZeroZeroZeroZeroInside\,\% of the individual NEES values inside their
-$\chi^2_2$ interval. Values below 2 are expected from the deliberately inflated process noise.
-During acquisition, however, even runs that eventually converge have ANEES far above 2: while
-most of the weight sits on a wrong mode and a few particles remain near the truth, the weighted
-covariance ($\sim$50\,m) understates the error ($\sim$500\,m). A Gaussian consistency measure
-simply does not fit a multimodal posterior; the NEES is informative only once the posterior is
-unimodal.
+\paragraph{Consistency.} Over all runs the ANEES is meaningless --- of order
+$10^{\EFiveMaxAneesAllExp}$ --- because a falsely locked cloud is tight and far from the truth
+(\cref{fig:e5anees}, top). In the tracking window of converged runs the PF is clearly
+\emph{conservative}: its ANEES is \EFiveHillSOneZeroZeroPfTwoZeroZeroZeroZeroAneesConv{} at
+$\sigma_0 = 100$\,m and \EFiveHillSFiveZeroZeroPfTwoZeroZeroZeroZeroAneesConv{} at 500\,m on the
+hill country, about half the value 2 of a consistent filter and below the single-step 95\,\%
+interval [\EFiveAneesLo, \EFiveAneesHi] (an average over 100 steps would have an even narrower
+interval). Its covariance overstates the error, as expected from the deliberately inflated process
+noise. (The share of single-run NEES values inside the $\chi^2_2$ interval, about 95\,\% in
+\cref{tab:e5cons}, cannot reveal this: that interval is so wide that a NEES scaled by one half still
+falls inside it with about the same probability.) During acquisition, however, even runs that
+eventually converge have ANEES far above 2. For example, if 99\,\% of the weight sits on a mode
+500\,m from the truth and 1\,\% at the truth, the weighted standard deviation is only about 50\,m
+while the error is about 500\,m. A Gaussian consistency measure does not fit a multimodal
+posterior; the NEES is informative only once the posterior is unimodal.
 
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.6\textwidth]{e5_plans.pdf}
   \caption{E5: tracking RMSE of converged runs against the per-flight PCRB, for five fixed flight
     plans per region ($M = 100$ each, $\sigma_0 = 500$\,m). On the plains the bound is comparable
-    to the 50\,m convergence threshold, so restricting the RMSE to converged runs truncates it
-    and points fall below the diagonal; the unconditional RMSE never does.}\label{fig:e5plans}
+    to the 50\,m convergence threshold, so restricting the RMSE to converged runs truncates it.
+    For a fixed flight path the per-flight bound is a local (small-error) approximation, not a
+    strict bound: even the unconditional RMSE dips to \EFivePlanMinUnconditional{} of it at single
+    steps on the plains and one Kandy plan.}\label{fig:e5plans}
 \end{figure}
 
 \paragraph{Why the filters stay above the bound.} Per flight (\cref{fig:e5plans,tab:e5plans}),
@@ -363,8 +389,8 @@ recursion of \cref{app:mismatch} --- and the particle filter reaches
 \EFivePlanHillPfTwoZeroZeroZeroZeroRmse\,m, i.e.\ \EFivePlanHillPfTwoZeroZeroZeroZeroRatioTuned{}
 times what its tuning allows (Kandy: \EFivePlanKandyPfTwoZeroZeroZeroZeroRatioTuned). Nearly the
 whole factor of two to the bound is the deliberate process-noise inflation, not the particle
-approximation. With 5\,000 particles about 20\,\% of Monte Carlo error is added
-(\EFivePlanHillPfFiveZeroZeroZeroRatioTuned); the EKF's converged runs are
+approximation. With 5\,000 particles the ratio to the tuned limit is
+\EFivePlanHillPfFiveZeroZeroZeroRatioTuned{} (Monte Carlo error); the EKF's converged runs are
 \EFivePlanHillEkfRatioTuned{} times the tuned limit, because it linearises at its own estimate
 rather than at the truth.
 
@@ -379,6 +405,10 @@ the setting with the fewest false alarms was taken: window $L = \ESixWindow$, $p
 plain PF ($N = 5\,000$), the PF with the monitor, the PF with roughening ($K = 0.05$, the value
 that worked best in E3) and the PF with both. The monitor against the plain PF is the primary
 comparison; the other two were added because E3 had shown roughening to attack the same failure.
+Note that $K = 0.05$ was chosen in E3 on hill-country flights 0--99 of the main seeds, which are
+also the first 100 hill-country flights of this test (the flight depends only on the seed, the
+region and the run index), so the roughening results on that region are not fully independent of
+the choice of $K$.
 
 \begin{figure}[t]
   \centering
@@ -404,14 +434,15 @@ falsely, so there is nothing to detect.
 
 Roughening alone is almost as effective on the hills
 (\ESixHillSTwoZeroZeroZeroPfRoughConv\,\%) but leaves more false locks
-(\ESixHillSTwoZeroZeroZeroPfRoughFl\,\%), and it is the only variant that helps on the plains
-(\ESixPlainsSTwoZeroZeroZeroPfRoughConv\,\%). The two mechanisms are complementary: roughening
+(\ESixHillSTwoZeroZeroZeroPfRoughFl\,\%), and roughening --- alone or with the monitor --- is what
+helps on the plains (\ESixPlainsSTwoZeroZeroZeroPfRoughConv{} and
+\ESixPlainsSTwoZeroZeroZeroPfMonitorRoughConv\,\%). The two mechanisms are complementary: roughening
 prevents locks by keeping hypotheses near the truth alive during acquisition; the monitor recovers
 from those that still happen. Together they reach \ESixHillSTwoZeroZeroZeroPfMonitorRoughConv\,\%
 (hill country) and \ESixKandySTwoZeroZeroZeroPfMonitorRoughConv\,\% (Kandy) at $\sigma_0 = 2$\,km,
 with at most \ESixHillSTwoZeroZeroZeroPfMonitorRoughFl\,\% false locks --- better than the plain
-filter with 20\,000 particles in E1 (\EOneHillSTwoZeroZeroZeroPfTwoZeroZeroZeroZeroConv\,\%), at a
-quarter of the cost. With roughening, the monitor fires in only
+filter with 20\,000 particles on the same flights in E1
+(\EOneHillSTwoZeroZeroZeroPfTwoZeroZeroZeroZeroConv\,\%), with a quarter of the particles. With roughening, the monitor fires in only
 \ESixHillSTwoZeroZeroZeroPfMonitorRoughAlarm\,\% of the hill-country runs instead of
 \ESixHillSTwoZeroZeroZeroPfMonitorAlarm\,\%: there are fewer locks to catch.
 
@@ -424,35 +455,45 @@ $N$ (\cref{tab:runtime}), so equal $N$ is also equal runtime (\cref{fig:e7rt}).
   \centering
   \includegraphics[width=\textwidth]{e7_equal_n.pdf}
   \caption{E7: plain PF vs.\ RBPF at equal particle count: convergence (top), tracking RMSE
-    (middle) and RMS error of the INS-bias estimate in the tracking window (bottom; the prior
-    alone gives \ESevenPriorBias\,m/s). $M = \ESevenRuns$, $\sigma_0 = 1$\,km, 95\,\% intervals.}\label{fig:e7}
+    (middle) and RMS error of the INS-bias estimate in the tracking window (bottom; converged runs;
+    dotted: the error of the prior alone, \ESevenPriorBias\,m/s). $M = \ESevenRuns$, $\sigma_0 = 1$\,km, 95\,\% intervals.}\label{fig:e7}
 \end{figure}
 
 On the hilly regions the RBPF converges about as often as the plain PF (no significant difference,
-McNemar $p \ge \ESevenHillyMinP$; \cref{tab:e7}); on the plains it converges more often at every $N$
-(\ESevenPlainsRbpfNTwoZeroZeroZeroConv\,\% vs.\ \ESevenPlainsPfNTwoZeroZeroZeroConv\,\% at
-$N = 2\,000$, $p = \ESevenPlainsNTwoZeroZeroZeroP$). Its clearest advantage is in the quantity it computes exactly
-(\cref{fig:e7}): with $N = 5\,000$ on the hill country its bias estimate has an RMS error of
-\ESevenHillRbpfNFiveZeroZeroZeroBias\,m/s, against \ESevenHillPfNFiveZeroZeroZeroBias\,m/s for the
-plain PF --- whose bias estimate is \emph{no better than the prior} (\ESevenPriorBias\,m/s). This is the
-well-known impoverishment of an almost static parameter: the bias changes by only 0.002\,m/s
-per step, so after repeated resampling all particles' bias values descend from a few ancestors,
-and the estimate is roughly one random draw from the prior. The RBPF never samples the bias and
-cannot impoverish it. The better bias carries over to tracking: from $N = 2\,000$ the RBPF's
-tracking RMSE is lower (\ESevenHillRbpfNFiveZeroZeroZeroTrack{} vs.\
-\ESevenHillPfNFiveZeroZeroZeroTrack\,m on the hill country at $N = 5\,000$). With 500 particles
-the advantage disappears: each particle's bias filter is then driven by few, noisy position
-increments.
+McNemar $p \ge \ESevenHillyMinP$; \cref{tab:e7}); on the plains its convergence rate is higher at
+every $N$, significantly so only at $N = 2\,000$ (\ESevenPlainsRbpfNTwoZeroZeroZeroConv\,\% vs.\
+\ESevenPlainsPfNTwoZeroZeroZeroConv\,\%, $p = \ESevenPlainsNTwoZeroZeroZeroP$). Its clearest
+advantage is in the quantity it computes exactly, \emph{once the position is locked on}
+(\cref{fig:e7}): in converged runs with $N = 5\,000$ on the hill country its bias estimate has an
+RMS error of \ESevenHillRbpfNFiveZeroZeroZeroBias\,m/s, against
+\ESevenHillPfNFiveZeroZeroZeroBias\,m/s for the plain PF --- whose bias estimate on the hilly
+regions is \emph{no better than the prior} (\ESevenPriorBias\,m/s). This is the well-known
+impoverishment of an almost static parameter: the bias changes by only 0.002\,m/s per step, so
+after repeated resampling all particles' bias values descend from a few ancestors, and the estimate
+is roughly one random draw from the prior. The RBPF never samples the bias and cannot impoverish
+it. The advantage is conditional, however: over \emph{all} runs the RBPF's bias error is much
+larger (\ESevenHillRbpfNFiveZeroZeroZeroBiasAll{} vs.\ \ESevenHillPfNFiveZeroZeroZeroBiasAll\,m/s on
+the hill country), because in runs locked onto the wrong terrain its exact bias update is driven by
+position increments that are themselves wrong. The better bias carries over to tracking at
+$N = 5\,000$: on runs where both filters converged, the plain PF's tracking RMSE is higher by
+\ESevenHillNFiveZeroZeroZeroTrackDiff{} [\ESevenHillNFiveZeroZeroZeroTrackDiffLo,
+\ESevenHillNFiveZeroZeroZeroTrackDiffHi]\,m on the hill country (paired bootstrap; Kandy
+\ESevenKandyNFiveZeroZeroZeroTrackDiff{} [\ESevenKandyNFiveZeroZeroZeroTrackDiffLo,
+\ESevenKandyNFiveZeroZeroZeroTrackDiffHi]\,m); at $N = 2\,000$ the difference is not significant.
+With 500 particles the advantage disappears: each particle's bias filter is then driven by few,
+noisy position increments. On the plains, where the plain PF resamples less, its bias estimate is
+not impoverished in the same way.
 
 
 \subsection{Illustration}\label{sec:illustration}
 \Cref{fig:snapshots,fig:trajectory} show one run, chosen by a fixed rule rather than by eye: the
 lowest-index E1 run on the hill country with $\sigma_0 = 2$\,km in which the 20\,000-particle PF
 converged after at least 60\,s and the EKF did not. It was re-simulated from its seeds with the
-particle cloud recorded, reproducing the saved run exactly. Five seconds after take-off the cloud
-has fragmented into clusters along terrain contours --- the multimodal posterior the EKF cannot
-represent. By 20\,s it has collapsed onto one tight cluster \VisErrTwenty\,m from the truth, a
-temporarily wrong mode (\VisErrSixty\,m at 60\,s); from \VisConvTime\,s on its error stays below 50\,m. Meanwhile the EKF confidently follows the wrong slope away from the truth and ends
+particle cloud recorded, reproducing the saved run exactly. Five seconds after take-off most of the
+weight is in a compact cluster near the truth, with scattered secondary clusters still alive
+elsewhere --- several hypotheses at once, which the EKF cannot represent. By 20\,s the cloud has
+collapsed onto one tight cluster \VisErrTwenty\,m from the truth, a temporarily wrong mode
+(\VisErrSixty\,m at 60\,s); from \VisConvTime\,s on its error stays below 50\,m. Meanwhile the EKF confidently follows the wrong slope away from the truth and ends
 \VisEkfFinal\,km off, further than dead reckoning (\VisDrFinal\,km). An animation of this run (\texttt{report/figures/visuals\_animation.mp4})
 is in the repository.
 

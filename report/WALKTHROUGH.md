@@ -63,7 +63,7 @@ PF 20 000 violet, RBPF pink, monitor yellow.
 | `region_map`, `terrain_overview` | the three boxes on the island; elevation + hillshade of each | elevation scales differ: the plains span only 127 m |
 | `e1_rates` | % converged (top) and % false lock (bottom) vs σ₀, per region | EKF fails already at σ₀ = 100 m on real hills; PF degrades gracefully; on the plains the PF almost never false-locks |
 | `e1_error_vs_time` | median error over time (σ₀ = 500 / 2000 m) | EKF error *grows* past dead reckoning on the hills; PF drops to metres in 10–20 s |
-| `e2_scatter` | per-flight error vs roughness under the flight | opposite slopes: PF ρ ≈ −0.63, EKF ρ ≈ +0.29 |
+| `e2_scatter` | per-flight error vs roughness under the flight | opposite slopes across regions (pooled PF ρ ≈ −0.63, EKF ρ ≈ +0.29); within a region weak |
 | `e2_binned` | convergence vs terrain information along the flight | more information → more convergence, for both filters |
 | `e3_particles` | convergence vs N; tracking RMSE vs runtime | particles buy acquisition robustness, not tracking accuracy |
 | `e3_design` | resampling scheme / ESS threshold / roughening | only roughening matters (K = 0.05: 71 → 94 %) |
@@ -72,9 +72,9 @@ PF 20 000 violet, RBPF pink, monitor yellow.
 | `e4_ins_grade` | INS bias 0.1 / 0.3 / 1.0 m/s | worse INS → worse tracking; PF still converges |
 | `e5_bound` | RMSE (all runs thick, converged thin) vs PCRB | the bound is never crossed; the gap between thick and thin is ambiguity |
 | `e5_anees` | ANEES vs time (all / converged runs) | meaningless over all runs (false locks); consistent-to-conservative in tracking |
-| `e5_plans` | per-flight tracking RMSE vs per-flight bound | ≈ 2× on the hills = the tuning (mismatched-gain analysis); plains points below the line are a selection effect |
+| `e5_plans` | per-flight tracking RMSE vs per-flight bound | ≈ 2× on the hills = the tuning (mismatched-gain analysis); plains points near the line are conditional; the per-flight bound is a local approximation |
 | `e6_test` | convergence / false lock with monitor, roughening, both | see §4.7 of the report |
-| `e7_equal_n`, `e7_equal_runtime` | RBPF vs PF | RBPF bias error far lower; the PF's bias estimate is no better than the prior |
+| `e7_equal_n`, `e7_equal_runtime` | RBPF vs PF | converged runs: RBPF bias error far lower, the PF's no better than the prior (dotted line); over all runs the RBPF's is larger |
 | `visuals_snapshots`, `visuals_trajectory`, `visuals_animation.mp4/.gif` | one run chosen by a fixed rule | multimodal cloud at 5 s, temporary wrong mode at 20–60 s, lock-on by 150 s; EKF wanders off |
 
 ## 4. Known limitations (see also report §5.5)
@@ -130,11 +130,12 @@ PF 20 000 violet, RBPF pink, monitor yellow.
 12. **What is the Copernicus DEM's accuracy and why does DSM matter?** < 4 m absolute, < 2–4 m
     relative (LE90); it includes vegetation and buildings, which the radar may not see.
 
-13. **What was the most surprising result?** How early the EKF fails on real terrain
-    (σ₀ = 100 m) compared with the smooth synthetic map (held up to 1 km) — the real DEM's slope
-    changes within a few cells.
+13. **What was the most surprising result?** How early the EKF fails on real terrain: 15 % false
+    locks already at σ₀ = 100 m, 28 % convergence at 500 m vs 68 % on the smooth synthetic map
+    under the same protocol — the real DEM's slope changes within a few cells.
 14. **Why is the EKF worse than dead reckoning?** Wrong-slope corrections also corrupt its bias
-    estimate, so it drifts faster than the uncorrected INS.
+    estimate, so it drifts faster than the uncorrected INS. This is specific to an EKF without
+    innovation gating; a gated EKF would fail less destructively (not tested).
 15. **Why do more particles help acquisition but hardly tracking?** Acquisition needs particles
     near the truth among kilometres of prior; tracking needs only a few hundred around one mode.
 16. **Why does roughening help so much?** The jitter scales with the cloud spread, so it is an
@@ -143,9 +144,11 @@ PF 20 000 violet, RBPF pink, monitor yellow.
 17. **Did the resampling scheme matter?** Not for convergence or RMSE (as Hol et al. found), even
     though the measured offspring variance ranks multinomial > residual > stratified > systematic.
 18. **Why are the filters ≈ 2× above the PCRB?** Their process noise is inflated (2 m/step vs
-    0.05 m); a Kalman filter with the true slopes but the same tuning is only ≈ 5 % better than
+    0.05 m); a Kalman filter with the true slopes but the same tuning is only ≈ 10 % better than
     PF 20 000.
-19. **Can the RMSE be below the PCRB?** Not unconditionally (checked: never). The converged-only
+19. **Can the RMSE be below the PCRB?** Not the ensemble bound (checked: the all-run RMSE is
+    always ≥ 1.29× it). The *per-flight* bound is only a local approximation for a fixed path, and
+    single steps dip to 0.87× it on the plains. The converged-only
     RMSE on the plains is below it because selecting runs with error < 50 m truncates the errors
     where the bound itself is ≈ 25–36 m.
 20. **Why is the NEES so large during acquisition?** The weighted covariance of a cloud dominated
@@ -154,7 +157,8 @@ PF 20 000 violet, RBPF pink, monitor yellow.
     in advance; when no setting met the false-alarm constraint, the recorded extension (lowest
     false-alarm rate) was applied before the test seeds were run.
 22. **Why the RBPF?** The bias is static-ish and linear-Gaussian given the path; the plain PF
-    impoverishes it (estimate no better than the prior), the RBPF computes it exactly at the same
-    cost.
+    impoverishes it (on the hills its estimate is no better than the prior), the RBPF computes it
+    exactly at the same cost — but only once locked on: in runs on the wrong terrain its bias error
+    is much larger than the plain PF's.
 23. **What would you do next?** Rao-Blackwellise the offset state, a likelihood-informed proposal
     against false lock, and real flight data.

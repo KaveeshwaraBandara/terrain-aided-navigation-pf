@@ -29,10 +29,18 @@ HOLD = 100.0
 
 
 def window_rms(exp: str, quick: bool, df: pd.DataFrame, filters: list[str]) -> pd.DataFrame:
-    """RMS position error over the final 100 s of every run (converged or not)."""
-    parts = []
-    for (study, config), _ in df.groupby(["study", "config"]):
-        data = series(exp, quick, study, config, [f"{f}__err" for f in filters] + ["t"])
+    """RMS position error over the final 100 s of every run (converged or not), and the
+    terrain statistics under each flight recomputed from the saved true track (so they use
+    the current definition: gradient of the bilinear interpolant)."""
+    from ..config import load_config
+    from ..experiment import build_dem
+    from ..terrain import along_track_stats
+
+    base = load_config()
+    meas_sigma = float(base["particle_filter"]["meas_sigma"])
+    parts, terr = [], []
+    for (study, config, region), _ in df.groupby(["study", "config", "region"]):
+        data = series(exp, quick, study, config, [f"{f}__err" for f in filters] + ["t", "truth"])
         t = data["t"][0]
         win = t > t[-1] - HOLD + 1e-9
         for f in filters:
@@ -48,6 +56,20 @@ def window_rms(exp: str, quick: bool, df: pd.DataFrame, filters: list[str]) -> p
                     }
                 )
             )
+        dem = build_dem({**base, "region": region})
+        for run, path in zip(data["_run"], data["truth"], strict=True):
+            st = along_track_stats(dem, path, meas_sigma=meas_sigma)
+            terr.append(
+                {
+                    "study": study,
+                    "config": config,
+                    "run": run,
+                    **{f"terrain_{k}": v for k, v in st.items()},
+                }
+            )
+    terr_df = pd.DataFrame(terr)
+    df = df.drop(columns=[c for c in terr_df.columns if c.startswith("terrain_")])
+    df = df.merge(terr_df, on=["study", "config", "run"], how="left")
     return df.merge(pd.concat(parts), on=["study", "config", "filter", "run"], how="left")
 
 
@@ -103,7 +125,7 @@ def make(exp: str = "e2", quick: bool = False) -> None:
                     label=f"{REGION_LABELS.get(region, region)}, not converged",
                 )
             rho, lo, hi = spearman_ci(g["terrain_roughness_1km_m"], g["window_rms_m"], rng)
-            ax.set_title(f"{st['label']}: Spearman ρ = {rho:.2f} [{lo:.2f}, {hi:.2f}]")
+            ax.set_title(f"{st['label']}: pooled ρ = {rho:.2f} [{lo:.2f}, {hi:.2f}]")
             macros[macro_name("e2 rho", f)] = fmt(rho, 2)
             macros[macro_name("e2 rho", f, "lo")] = fmt(lo, 2)
             macros[macro_name("e2 rho", f, "hi")] = fmt(hi, 2)
@@ -130,9 +152,16 @@ def make(exp: str = "e2", quick: bool = False) -> None:
             for r in regions
         ]
         handles += [
-            Line2D([], [], ls="none", marker="o", color=MUTED, ms=4, label="converged"),
+            Line2D([], [], ls="none", marker="h", color=MUTED, ms=5, label="filled: converged"),
             Line2D(
-                [], [], ls="none", marker="o", mfc="none", color=MUTED, ms=4, label="not converged"
+                [],
+                [],
+                ls="none",
+                marker="h",
+                mfc="none",
+                color=MUTED,
+                ms=5,
+                label="hollow: not converged",
             ),
             Line2D([], [], color="#8a8984", lw=0.8, ls=":", label="50 m threshold"),
         ]
@@ -189,7 +218,8 @@ def make(exp: str = "e2", quick: bool = False) -> None:
             cross = np.sqrt(conv["tracking_mse_cross_m2"].mean()) if len(conv) else np.nan
             ia = g["terrain_fisher_along_per_m2"].median()
             ic = g["terrain_fisher_cross_per_m2"].median()
-            rho_r = stats.spearmanr(g["terrain_roughness_1km_m"], g["window_rms_m"]).statistic
+            sp = stats.spearmanr(g["terrain_roughness_1km_m"], g["window_rms_m"])
+            rho_r, p_r = sp.statistic, sp.pvalue
             rows.append(
                 [
                     REGION_LABELS.get(region, region),
@@ -223,6 +253,7 @@ def make(exp: str = "e2", quick: bool = False) -> None:
             macros[macro_name(*base, "cross")] = fmt(cross)
             macros[macro_name(*base, "rough")] = fmt(g["terrain_roughness_1km_m"].median())
             macros[macro_name(*base, "rho")] = fmt(rho_r, 2)
+            macros[macro_name(*base, "rho p")] = fmt(p_r, 2) if p_r >= 0.01 else "<0.01"
     out.table(
         "regions",
         [

@@ -18,6 +18,55 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — M5: independent review, and what changed because of it
+
+A fresh reviewer (no prior context, read-only) checked the report against the code and
+`results/*/summary.csv`. Every major finding was re-checked here before acting; all were confirmed.
+
+**Corrections of earlier claims (this log included):**
+1. **Synthetic vs real EKF.** "On synthetic terrain the EKF held up to σ₀ = 1 km" (2026-11-04
+   entry, 12 runs, fixed flight; repeated in the E1 entry and the report) is **wrong** for the
+   matched protocol: the 300-run synthetic E1 (`results/e1@synth`, now part of `make experiments`)
+   gives EKF convergence 91/86/68/39/25/16 % for σ₀ = 100…2000 m. The direction holds (500 m: 68 %
+   synthetic vs 28 % real hills) but "held up to 1 km" and "far earlier" were overstated.
+2. **E2 is mostly between regions.** The pooled ρ (PF −0.63, EKF +0.29) compares terrain types;
+   within regions the PF's per-flight ρ is −0.16 (p = 0.02, hill), −0.26 (p < 0.01, Kandy), −0.05
+   (p = 0.47, plains) and the EKF has no consistent relation. "Per flight … raises the EKF's error"
+   was removed.
+3. **PCRB gradient.** The bound used interpolated central-difference slopes (the EKF's Jacobian),
+   but the simulated altimeter measures the bilinear interpolant, whose exact gradient carries more
+   information (×1.09 hill, ×1.12 Kandy, ×1.58 plains). Fixed (`DEM.bilinear_gradient`, used by the
+   PCRB, the mismatched-gain analysis and the Fisher statistics; tests added). Consequences: the
+   ensemble check is stronger (all-run RMSE ≥ 1.29 × bound, was 1.10); per flight PF 20 000 is
+   2.05× (hill) the bound and 1.10× what its tuning allows (was 1.93× and 1.05×); Fisher densities
+   13.5 / 7.4 / 0.16 × 10⁻³ m⁻².
+4. **Per-flight bound is not strict.** The caption claim "the unconditional RMSE never [falls below
+   it]" was unverified; it is false at single steps (min 0.87, plains and one Kandy plan). For a
+   fixed path with a random guess the per-flight bound is a local approximation — stated now.
+5. **Validation.** PF 20 000 vs exact KF reaches 0.57 σ in one of five seeds (others ≤ 0.17 σ),
+   above the unit test's 0.25 tolerance (different seed). Diagnosed: the position deviation follows
+   the bias deviation (corr 0.68 in that seed) and all seeds stay ≤ 0.20 σ when the bias samples are
+   rejuvenated → bias impoverishment, not an update error. Reported as such.
+6. **ANEES** ≈ 1 in tracking is *conservative by a factor ≈ 2*, not "consistent to slightly
+   conservative"; the "share inside χ²₂" metric cannot detect a factor-2 scale.
+7. **E7.** The RBPF's bias advantage holds for converged runs only; over all runs its bias error is
+   larger (1.52 vs 0.52 m/s hill, N = 5 000) because its exact update follows wrong position
+   increments when locked on the wrong terrain. Tracking gain significant at N = 5 000 only
+   (paired bootstrap 1.7 [0.4, 2.8] m hill); plains convergence gain significant at N = 2 000 only.
+8. **"Worse than no terrain aiding"** is specific to this EKF (no gating, unconstrained bias).
+9. Smaller items fixed: dead reckoning converges in up to 5 % of runs at σ₀ = 100 m (caption said
+   never); roughening: tracking RMSE keeps falling with K, the K = 0.2 drop is not significant, and
+   "quarter of the cost" was unsupported (cost not benchmarked); E6: K = 0.05 was chosen on the same
+   hill flights 0–99 (now disclosed); roughening *with or without* the monitor helps the plains;
+   E4: the map-error field does raise tracking RMSE (8.2 → 11.4 m) and its correlation length is an
+   assumption; "immune" → "robust"; the EKF false-locks most on the hills, not the plains; plains
+   non-converged runs end at a few tens of metres; methodology details (pointers, truncated prior,
+   d = 5 with the offset state, σ_z in the NIS under Student-t, 13 nats for a 100 m outlier);
+   remaining hand-typed numbers replaced by macros; cross-experiment reuse of flights disclosed;
+   figure fixes (% axis, legends, prior line, label overlap, ANEES interval per row).
+
+---
+
 ## 2026-11-19 — M5: fresh clone and repository hygiene
 
 - **Fresh clone** (`git clone` of the local repo into a temporary folder, only the downloaded

@@ -4,17 +4,18 @@ navigation --- in simulation over real Copernicus GLO-30 terrain of three contra
 Sri Lanka, chosen by a pre-registered rule. A vectorised sequential importance resampling
 particle filter is compared with an extended Kalman filter and INS dead reckoning in seven
 Monte Carlo experiments with common random numbers, paired tests and confidence intervals. On real
-terrain the EKF's linearisation fails far earlier than on smooth synthetic hills: it converges in
-only \EOneHillSFiveZeroZeroEkfConv\,\% of runs at 500\,m initial uncertainty over the highlands and
-ends worse than dead reckoning, while a 20\,000-particle filter converges in
+terrain the EKF's linearisation fails earlier than on smooth synthetic hills: over the highlands it
+converges in only \EOneHillSFiveZeroZeroEkfConv\,\% of runs at 500\,m initial uncertainty (synthetic
+terrain: \EOneSynthSFiveZeroZeroEkfConv\,\%) and, without innovation gating, ends worse than dead
+reckoning, while a 20\,000-particle filter converges in
 \EOneHillSFiveZeroZeroPfTwoZeroZeroZeroZeroConv\,\% and tracks at about
-\EOneHillSFiveZeroZeroPfTwoZeroZeroZeroZeroTrack\,m. Per flight, rougher terrain lowers the particle
-filter's error and raises the EKF's. The particle filter's characteristic failure, false lock onto
-a wrong patch of terrain, is countered by roughening and by an online divergence monitor based on
-the normalised innovation squared: together they raise convergence at 2\,km initial uncertainty
-from \ESixHillSTwoZeroZeroZeroPfFiveZeroZeroZeroConv\,\% to
-\ESixHillSTwoZeroZeroZeroPfMonitorRoughConv\,\%. A Student-$t$ likelihood makes the filter immune to
-radar outliers, and a Rao-Blackwellised filter estimates the INS bias that the plain filter cannot.
-In the tracking phase the filters stay about twice above the posterior Cramér--Rao bound, a gap
-that a mismatched-gain analysis attributes almost entirely to their deliberately inflated process
-noise.
+\EOneHillSFiveZeroZeroPfTwoZeroZeroZeroZeroTrack\,m. Across terrain types, rougher terrain lowers the
+particle filter's error and raises the EKF's. The particle filter's characteristic failure, false
+lock onto a wrong patch of terrain, is countered by roughening and by an online divergence monitor
+based on the normalised innovation squared: together they raise convergence at 2\,km initial
+uncertainty from \ESixHillSTwoZeroZeroZeroPfFiveZeroZeroZeroConv\,\% to
+\ESixHillSTwoZeroZeroZeroPfMonitorRoughConv\,\%. A Student-$t$ likelihood keeps the filter robust to
+radar outliers, and a Rao-Blackwellised filter estimates the INS bias much better once the position
+is locked on. In the tracking phase the 20\,000-particle filter stays about twice above the
+posterior Cramér--Rao bound, a gap that a mismatched-gain analysis attributes almost entirely to its
+deliberately inflated process noise.

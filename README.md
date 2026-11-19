@@ -116,15 +116,18 @@ against the initial position uncertainty σ₀ (`report/tables/e1_convergence.cs
 | 1000 m | 14 % (84 %) | 72 % (25 %) | 92 % (6 %) |
 | 2000 m | 6 % (93 %) | 40 % (54 %) | 70 % (29 %) |
 
-- On real 30 m terrain the EKF's linearisation fails already at σ₀ = 100 m (on smooth synthetic
-  hills it held up to 1 km), and once it fails it ends worse than dead reckoning.
-- Rougher terrain under a flight lowers the PF's error (Spearman −0.63) and raises the EKF's (+0.29).
+- On real 30 m terrain the EKF's linearisation fails earlier than on smooth synthetic hills
+  (σ₀ = 500 m: 28 % vs 68 % convergence under the same protocol), and this ungated EKF then ends
+  worse than dead reckoning.
+- Across terrain types rougher terrain lowers the PF's error (pooled Spearman −0.63) and raises the
+  EKF's (+0.29); between flights within one region the relation is weak.
 - False lock is the PF's failure mode; at σ₀ = 2 km a divergence monitor (no ground truth) plus
   roughening raise convergence from 40 % to 96 % with 5 000 particles
   (`report/tables/e6_test.csv`).
-- A Student-t likelihood makes the PF immune to radar outliers; the Rao-Blackwellised PF
-  estimates the INS bias that the plain PF cannot; in the tracking phase the filters stay ≈ 2×
-  above the posterior Cramér–Rao bound, almost entirely because of their inflated process noise.
+- A Student-t likelihood keeps the PF robust to radar outliers; once locked on, the
+  Rao-Blackwellised PF estimates the INS bias much better than the plain PF; in the tracking phase
+  PF 20 000 stays ≈ 2× above the posterior Cramér–Rao bound, almost entirely because of its
+  inflated process noise.
 
 Full report: `report/latex/` (Overleaf-ready); running lab notebook: `report/findings.md`;
 guide to the code, figures and likely questions: `report/WALKTHROUGH.md`.

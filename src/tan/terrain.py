@@ -11,7 +11,8 @@ Definitions (every one is stated in the report):
   ``window_m`` metres (default 1 km), averaged over the region. Insensitive to a
   constant tilt over large distances, sensitive to hills and valleys at the scale
   the filter has to resolve.
-- Fisher information density: E[|∇h|²] / σ_z² (1/m²). For a locally linear terrain
+- Fisher information density: E[|∇h|²] / σ_z² (1/m²), with ∇h the gradient of the bilinear
+  interpolant (the surface the simulated altimeter measures). For a locally linear terrain
   one altimeter measurement adds |∇h|²/σ_z² to the position information along the
   gradient direction, so this is the average information per measurement and the
   quantity that drives the PCRB (Experiment 5).
@@ -63,7 +64,7 @@ def terrain_stats(dem: DEM, meas_sigma: float = 3.6, window_m: float = 1000.0) -
         "slope_mean_pct": float(100.0 * g.mean()),
         "slope_std_pct": float(100.0 * g.std()),
         "roughness_1km_m": float(rough.mean()),
-        "fisher_density_per_m2": float(np.mean(g * g) / meas_sigma**2),
+        "fisher_density_per_m2": dem.mean_squared_bilinear_gradient() / meas_sigma**2,
     }
 
 
@@ -88,7 +89,7 @@ def along_track_stats(
     """
     x, y = xy[:, 0], xy[:, 1]
     heights = dem.height(x, y)
-    gx, gy = dem.gradient(x, y)
+    gx, gy = dem.bilinear_gradient(x, y)  # gradient of the measured surface h
     rough = roughness_dem(dem, window_m).height(x, y)
 
     # unit vectors along and across the local direction of travel

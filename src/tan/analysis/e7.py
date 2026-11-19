@@ -8,7 +8,7 @@ import numpy as np
 from matplotlib.figure import Figure
 
 from ..config import REPO_ROOT
-from ..metrics import mcnemar
+from ..metrics import mcnemar, paired_bootstrap_rmse_diff
 from ..plotting import TEXT_WIDTH_IN, report_style, save_report, style_of
 from .common import (
     REGION_LABELS,
@@ -51,6 +51,7 @@ def make(exp: str = "e7", quick: bool = False) -> None:
             "conv": rate(g, "converged"),
             "track": pooled_rmse(conv["tracking_mse_m2"].to_numpy(), rng),
             "bias": pooled_rmse((conv["tracking_bias_rmse_mps"] ** 2).to_numpy(), rng),
+            "bias_all": pooled_rmse((g["tracking_bias_rmse_mps"] ** 2).to_numpy(), rng),
         }
 
     with report_style():
@@ -83,6 +84,11 @@ def make(exp: str = "e7", quick: bool = False) -> None:
             axes[0, 0].set_ylabel("Converged runs (%)")
             axes[1, 0].set_ylabel("Tracking RMSE (m)")
             axes[2, 0].set_ylabel("Bias RMSE (m/s)")
+        from ..config import load_config
+
+        prior = float(np.sqrt(2.0) * load_config()["simulation"]["ins"]["bias_sigma0"])
+        for ax in axes[2]:
+            ax.axhline(prior, color="#8a8984", lw=0.8, ls=":", label="prior only")
         axes[0, -1].legend(loc="lower right")
         save_report(fig, out.figure("equal_n"))
 
@@ -155,8 +161,18 @@ def make(exp: str = "e7", quick: bool = False) -> None:
                     t["p_value"],
                 ]
             )
+            # tracking RMSE difference PF - RBPF on runs where both converged (paired bootstrap)
+            both = piv["pf"].to_numpy() & piv["rbpf"].to_numpy()
+            mse = g.pivot(index="run", columns="kind", values="tracking_mse_m2").to_numpy()[both]
+            if len(mse) > 2:
+                d = paired_bootstrap_rmse_diff(mse[:, 0], mse[:, 1], rng)
+                key = ("e7", REGION_SHORT.get(region, region), f"n{n}", "track diff")
+                macros[macro_name(*key)] = fmt(d["diff"], 1)
+                macros[macro_name(*key, "lo")] = fmt(d["lo"], 1)
+                macros[macro_name(*key, "hi")] = fmt(d["hi"], 1)
             for kind, s in (("pf", a), ("rbpf", b)):
                 base = ("e7", REGION_SHORT.get(region, region), kind, f"n{n}")
+                macros[macro_name(*base, "bias all")] = fmt(s["bias_all"]["rmse"], 2)
                 macros[macro_name(*base, "conv")] = fmt(100 * s["conv"]["rate"], 0)
                 macros[macro_name(*base, "track")] = fmt(s["track"]["rmse"])
                 macros[macro_name(*base, "bias")] = fmt(s["bias"]["rmse"], 3)

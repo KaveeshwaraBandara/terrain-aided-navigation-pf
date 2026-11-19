@@ -75,7 +75,7 @@ def tuned_floor(cfg: dict, path: np.ndarray, dem) -> np.ndarray:
     s0 = float(cfg["init"]["position_sigma"])
     b0 = float(cfg["simulation"]["ins"]["bias_sigma0"])
     P0 = np.diag([s0**2, s0**2, b0**2, b0**2])
-    gx, gy = dem.gradient(path[:, 0], path[:, 1])
+    gx, gy = dem.bilinear_gradient(path[:, 0], path[:, 1])
     dt = float(cfg["simulation"]["dt"])
     A = mismatched_kf_error(np.column_stack([gx, gy]), P0, Qf, Rf, Qt, Rt, dt)
     return position_rmse_bound(A)
@@ -180,6 +180,7 @@ def make(exp: str = "e5", quick: bool = False) -> None:
             )
             macros["EFiveAneesLo"], macros["EFiveAneesHi"] = fmt(lo_b, 2), fmt(hi_b, 2)
     macros["EFiveMinRatioAll"] = fmt(min(r[11] for r in tcsv), 2)
+    macros["EFiveMaxAneesAllExp"] = str(int(np.floor(np.log10(max(r[5] for r in tcsv)))))
     out.table(
         "consistency",
         [
@@ -262,9 +263,25 @@ def make(exp: str = "e5", quick: bool = False) -> None:
             for i, which in enumerate(["all", "conv"]):
                 ax = axes[i, j]
                 axes_style(ax)
-                M = int(d1[(d1["region"] == region) & (d1[SIGMA] == s)]["run"].nunique())
-                lo, hi = anees_bounds(M)
-                ax.axhspan(lo, hi, color=MUTED, alpha=0.18, lw=0, label="95 % interval (M runs)")
+                cell = d1[(d1["region"] == region) & (d1[SIGMA] == s)]
+                if which == "all":
+                    M = int(cell["run"].nunique())
+                else:  # widest interval: the filter with the fewest converged runs
+                    M = int(
+                        cell[cell["filter"].isin(filters)]
+                        .groupby("filter")["converged"]
+                        .sum()
+                        .min()
+                    )
+                lo, hi = anees_bounds(max(M, 1))
+                ax.axhspan(
+                    lo,
+                    hi,
+                    color=MUTED,
+                    alpha=0.18,
+                    lw=0,
+                    label="95 % interval for a consistent filter",
+                )
                 ax.axhline(2.0, color=MUTED, lw=0.8)
                 for f in filters:
                     st = style_of(f)
@@ -321,6 +338,9 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                 conv = conv.to_numpy()
                 err = data[f"{f}__err"][conv][:, win].astype(float)
                 r = float(np.sqrt(np.mean(err**2))) if conv.any() else np.nan
+                # unconditional (all runs) RMSE per step against this flight's bound
+                all_err = data[f"{f}__err"].astype(float)
+                unc_min = float(np.min(np.sqrt(np.mean(all_err**2, axis=0)) / bound))
                 pts[f].append((b, r, region))
                 prows.append(
                     [
@@ -335,7 +355,9 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                         fmt(r / b_filt, 2),
                     ]
                 )
-                pcsv.append([region, plan, f, int(conv.sum()), b, b_filt, r, r / b, r / b_filt])
+                pcsv.append(
+                    [region, plan, f, int(conv.sum()), b, b_filt, r, r / b, r / b_filt, unc_min]
+                )
         out.table(
             "plans",
             [
@@ -361,6 +383,7 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                 "tracking_rmse_m",
                 "ratio",
                 "ratio_tuned_kf",
+                "min_unconditional_rmse_over_pcrb_any_step",
             ],
             csv_rows=pcsv,
         )
@@ -409,8 +432,10 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                 "rmse",
                 "ratio",
                 "ratio_tuned",
+                "unc_min",
             ],
         )
+        macros["EFivePlanMinUnconditional"] = fmt(float(pc["unc_min"].min()), 2)
         for (region, f), g in pc.groupby(["region", "filter"]):
             base = ("e5 plan", REGION_SHORT.get(region, region), f)
             macros[macro_name(*base, "pcrb")] = fmt(float(g["pcrb"].median()), 1)

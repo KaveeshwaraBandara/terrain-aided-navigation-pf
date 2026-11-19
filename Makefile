@@ -2,7 +2,7 @@ PY   ?= python3
 VENV ?= .venv
 BIN  := $(VENV)/bin
 JOBS ?= 10
-EXPERIMENTS := e1 e2 e3 e4 e5 e6 e7
+EXPERIMENTS := e1 e1@synth e2 e3 e4 e5 e6 e7
 
 .PHONY: setup test lint format data survey terrain run experiments quick smoke figures \
         benchmark visuals report clean

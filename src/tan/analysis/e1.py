@@ -228,6 +228,20 @@ def make(exp: str = "e1", quick: bool = False) -> None:
         csv_rows=test_csv,
     )
     macros["EOneRuns"] = str(M)
+    dr = df[df["filter"] == "dead_reckoning"]
+    if not dr.empty:  # dead reckoning only "converges" when the initial error happens to be small
+        macros["EOneDrMaxConv"] = pct(dr.groupby(["region", SIGMA])["converged"].mean().max())
+    ekf_pf = [r[6] for r in test_csv if r[2] == "ekf" and r[3] == "pf_5000"]
+    if ekf_pf:  # largest p-value of the 18 EKF-vs-PF tests, as a power of ten bound
+        macros["EOneEkfPfMaxPExp"] = str(int(np.ceil(np.log10(max(ekf_pf)))))
+    if exp == "e1" and not quick:
+        from ..runner import results_dir
+
+        if (results_dir("e1@synth", False) / "summary.csv").exists():
+            syn = load_summary("e1@synth")
+            for (s0, f), g in syn.groupby([SIGMA, "filter"]):
+                macros[macro_name("e1 synth", f"s{s0:g}", f, "conv")] = pct(g["converged"].mean())
+            macros["EOneSynthRuns"] = str(int(syn.groupby(["config", "filter"]).size().min()))
 
     # radar-altimeter ranges implied by the corridor altitude (A10): the flights are identical
     # for every sigma0 (common random numbers), so one configuration per region suffices

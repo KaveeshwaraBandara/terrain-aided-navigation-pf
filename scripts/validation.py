@@ -36,7 +36,15 @@ def main() -> None:
     kw = {k: v for k, v in cfg["particle_filter"].items() if k not in ("n_particles",)}
     kw["snapshot_every"] = 0
     rows, csv_rows, macros = [], [], {}
-    for name, cls, n in (("PF", ParticleFilter, 20000), ("RBPF", RaoBlackwellizedPF, 5000)):
+    # third variant: the same PF with the bias samples rejuvenated (10x bias random walk in both
+    # the PF and the reference Kalman filter) - tests whether deviations come from the
+    # impoverishment of the nearly static bias rather than from the update
+    variants = (
+        ("PF", ParticleFilter, 20000, {}),
+        ("RBPF", RaoBlackwellizedPF, 5000, {}),
+        ("PF rejuvenated", ParticleFilter, 20000, {"process_sigma_bias": 0.02}),
+    )
+    for name, cls, n, extra in variants:
         zpos, zbias, ratio = [], [], []
         for seed in range(SEEDS):
             sim = simulate(
@@ -45,8 +53,10 @@ def main() -> None:
                 dem,
                 run_streams(7, seed),
             )
-            kf = run_filter(ExtendedKalmanFilter(dem, **cfg["ekf"]), sim)
-            f = run_filter(cls(dem, n_particles=n, rng=filter_rng(7, seed, name), **kw), sim)
+            ekf_kw = {**cfg["ekf"], **extra}
+            kf = run_filter(ExtendedKalmanFilter(dem, **ekf_kw), sim)
+            rng = filter_rng(7, seed, name.split()[0])
+            f = run_filter(cls(dem, n_particles=n, rng=rng, **{**kw, **extra}), sim)
             sd = np.sqrt(np.einsum("kii->ki", kf.cov))
             z = np.abs(f.est - kf.est) / sd
             zpos.append(z[:, :2].max())
@@ -72,6 +82,22 @@ def main() -> None:
         macros[macro_name("val", name, "bias max")] = fmt(max(zbias), 2)
         macros[macro_name("val", name, "trace lo")] = fmt(r[:, 0].min(), 2)
         macros[macro_name("val", name, "trace hi")] = fmt(r[:, 1].max(), 2)
+        zs = sorted(zpos)
+        macros[macro_name("val", name, "pos second")] = fmt(zs[-2], 2)  # second-worst seed
+        if name == "PF":
+            # how strongly does the position deviation follow the bias deviation (worst seed)?
+            worst = int(np.argmax(zpos))
+            sim = simulate(
+                cfg["simulation"],
+                deep_update(cfg["init"], {"position_sigma": 100.0}),
+                dem,
+                run_streams(7, worst),
+            )
+            kf = run_filter(ExtendedKalmanFilter(dem, **cfg["ekf"]), sim)
+            f = run_filter(cls(dem, n_particles=n, rng=filter_rng(7, worst, "PF"), **kw), sim)
+            z = np.abs(f.est - kf.est) / np.sqrt(np.einsum("kii->ki", kf.cov))
+            corr = np.corrcoef(z[:, :2].max(1), z[:, 2:].max(1))[0, 1]
+            macros["ValPFWorstSeedCorr"] = fmt(float(corr), 2)
     write_table(
         "validation",
         [

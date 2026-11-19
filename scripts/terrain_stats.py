@@ -31,7 +31,7 @@ from tan.terrain import terrain_stats
 
 TITLES = {
     "hill_country": "Hill country (Nuwara Eliya)",
-    "kandy_rolling": "Mid-country (Kandy)",
+    "kandy_rolling": "Kandy (mid-country)",
     "north_central_plains": "Dry-zone plains (Anuradhapura)",
     "synthetic": "Synthetic (reference)",
 }
@@ -82,6 +82,18 @@ def main() -> None:
         for key, _, digits in ROWS:
             scale = 1e3 if key == "fisher_density_per_m2" else 1.0
             macros[macro_name("terr", SHORT[n], key)] = fmt(stats[n][key] * scale, digits)
+        # information in the exact (bilinear) gradient relative to the smoothed slopes the EKF
+        # uses (central differences, interpolated) at the same 200 000 random positions
+        d = dems[n]
+        rs = np.random.default_rng(0)
+        b = d.bounds
+        x = rs.uniform(b[0] + 100, b[1] - 100, 200_000)
+        y = rs.uniform(b[2] + 100, b[3] - 100, 200_000)
+        ex, ey = d.bilinear_gradient(x, y)
+        sx, sy = d.gradient(x, y)
+        macros[macro_name("terr", SHORT[n], "grad ratio")] = fmt(
+            float(np.mean(ex**2 + ey**2) / np.mean(sx**2 + sy**2)), 2
+        )
         xmin, xmax, ymin, ymax = dems[n].extent
         macros[macro_name("terr", SHORT[n], "width km")] = fmt((xmax - xmin) / 1e3, 1)
         macros[macro_name("terr", SHORT[n], "height km")] = fmt((ymax - ymin) / 1e3, 1)

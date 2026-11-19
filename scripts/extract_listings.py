@@ -13,6 +13,7 @@ import inspect
 import subprocess
 import sys
 import textwrap
+from pathlib import Path
 
 from tan.config import REPO_ROOT, deep_update, dotted_to_nested, load_config, load_yaml
 from tan.filters import resampling
@@ -181,6 +182,8 @@ def main() -> None:
         macros["MachinePython"] = m["python"]
         macros["MachineNumpy"] = m["numpy"]
         macros["MachineOs"] = platform.freedesktop_os_release().get("PRETTY_NAME", "Linux")
+        mem_kb = int(Path("/proc/meminfo").read_text().split()[1])
+        macros["MachineRam"] = f"{mem_kb / 1e6:.0f}"
     write_macros("implementation", macros)
     print(f"{n_tests} tests, {loc} lines in src/tan")
 

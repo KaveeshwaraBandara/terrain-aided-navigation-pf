@@ -5,18 +5,21 @@ The decisive quantity is the ratio between the position uncertainty and the dist
 the terrain slope stays roughly constant. The EKF replaces the terrain by its tangent plane at the
 current estimate; that is adequate only when the error is small compared with the terrain's
 correlation length. The smooth synthetic hills used during development have correlation lengths of
-hundreds of metres to kilometres, and there the EKF held up to $\sigma_0 = 1$\,km. The real 30\,m
-DEM of the hill country changes slope within a few cells, so the EKF already fails in
-\EOneHillSOneZeroZeroEkfFl\,\% of the runs at $\sigma_0 = 100$\,m (E1). E2 shows the same effect
-from the other side: the rougher the terrain under a flight, the \emph{larger} the EKF's error
-($\rho = +\ETwoRhoEkf$) and the smaller the particle filter's ($\rho = \ETwoRhoPfFiveZeroZeroZero$).
-Terrain texture is information for an estimator that evaluates the likelihood globally and noise
-for one that linearises it locally.
+hundreds of metres to kilometres; under the same protocol the EKF converged there in
+\EOneSynthSFiveZeroZeroEkfConv\,\% of the runs at $\sigma_0 = 500$\,m. The real 30\,m DEM of the hill
+country changes slope within a few cells, so the EKF converges in only
+\EOneHillSFiveZeroZeroEkfConv\,\% at 500\,m and already locks falsely in
+\EOneHillSOneZeroZeroEkfFl\,\% of the runs at $\sigma_0 = 100$\,m (E1). E2 shows the same contrast
+across terrain types: the rougher region, the \emph{larger} the EKF's error and the smaller the
+particle filter's (pooled $\rho = +\ETwoRhoEkf$ and $\ETwoRhoPfFiveZeroZeroZero$); between flights
+within one region the relation is weak. Terrain texture is information for an estimator that
+evaluates the likelihood globally and noise for one that linearises it locally.
 
 Two consequences are worth stressing. First, a failed EKF is not merely inaccurate: its error
 grows faster than that of the uncorrected INS, because corrections computed from the wrong slope
-also corrupt its bias estimate (\cref{fig:e1time}). A linearised TAN filter whose linearisation is
-invalid is worse than no terrain aiding. Second, its failures are confident: the EKF's dominant
+also corrupt its bias estimate (\cref{fig:e1time}). This EKF, with an unconstrained bias state and
+no innovation gating, is then worse than no terrain aiding; a gated EKF would fail less
+destructively, though it would still lock onto the wrong hill. Second, its failures are confident: the EKF's dominant
 failure mode is false lock (\cref{fig:e1rates}), so its own covariance gives no warning.
 
 The particle filter pays for its robustness in computation, but on this problem the cost is
@@ -31,8 +34,8 @@ $\sigma_0 = 500$\,m); over the plains at \EOnePlainsSFiveZeroZeroPfTwoZeroZeroZe
 bound there (E5). The plains also show the most desirable property of a Bayesian filter: when the
 terrain says little, the particle filter's covariance stays wide and it almost never locks
 falsely (E1), so a navigation system could trust its own uncertainty and fall back on other
-sources. The EKF has no such honesty --- it false-locks most often precisely where the terrain is
-least informative relative to its linearisation errors.
+sources. The EKF has no such honesty: it locks falsely on every region, most often on the rough
+hills, where its linearisation is wrong soonest.
 
 The along-/cross-track decomposition (E2) did not show the elongated error along ridges and valleys
 one might expect: averaged over flights with a 25$^\circ$ heading weave over 40\,km of varied
@@ -43,8 +46,8 @@ flights along a valley, which this design does not isolate.
 \paragraph{False lock.} With a wide prior the particle filter's dominant failure is to collapse onto
 the wrong patch of terrain (E1, E3). Three remedies were tested on identical flights: more particles
 (E3: \EThreeNFiveKConv\,\% $\to$ \EThreeNTwentyKConv\,\% convergence from 5\,000 to 20\,000 at
-$\sigma_0 = 1$\,km), roughening (E3: \EThreeRoughZeroPointZeroFiveConv\,\% with $K = 0.05$ at the
-cost of 5\,000 particles) and the divergence monitor (E6). Roughening acts early, by keeping
+$\sigma_0 = 1$\,km), roughening (E3: \EThreeRoughZeroPointZeroFiveConv\,\% with $K = 0.05$ and
+5\,000 particles) and the divergence monitor (E6). Roughening acts early, by keeping
 hypotheses near the truth alive while the cloud is wide; the monitor acts late, by detecting a lock
 that has already happened and re-opening the search.
 On the main seeds (E6) the monitor alone lifts convergence at $\sigma_0 = 2$\,km on the hill
@@ -52,43 +55,49 @@ country from \ESixHillSTwoZeroZeroZeroPfFiveZeroZeroZeroConv\,\% to
 \ESixHillSTwoZeroZeroZeroPfMonitorConv\,\%, roughening alone to
 \ESixHillSTwoZeroZeroZeroPfRoughConv\,\%, and the two together to
 \ESixHillSTwoZeroZeroZeroPfMonitorRoughConv\,\% with almost no false locks --- more than four
-times as many particles achieve without them. The monitor's value lies in a property no amount of
+times as many particles achieve without them (E1, same flights). The monitor's value lies in a property no amount of
 particles provides: it turns a silent failure into a detected one, from information available on
 board (the predicted innovation), without ground truth. Its false alarms are cheap because the
 re-spread keeps half of the current cloud. Where the filter fails by imprecision rather than by
-locking (the plains), there is nothing for the monitor to detect, and only roughening helps.
+locking (the plains), there is nothing for the monitor to detect, and roughening is what helps.
 
 \paragraph{Altimeter outliers.} A Gaussian likelihood lets a single gross radar error destroy the
 particles at the truth. The Student-$t$ likelihood keeps convergence at
 \EFourOutliersHillOneZeroPfStudentTConv\,\% with 10\,\% outliers (Gaussian:
-\EFourOutliersHillOneZeroPfFiveZeroZeroZeroConv\,\%) and costs nothing without them (E4). There is
-no reason not to use it.
+\EFourOutliersHillOneZeroPfFiveZeroZeroZeroConv\,\%) and costs nothing without them (E4). Only one
+outlier model was tested (zero-mean, 100\,m standard deviation); within that, there is no reason not
+to use it.
 
 \paragraph{Map and altimeter offsets.} A random map error of the size the Copernicus handbook
-implies is harmless, but a constant offset between measured and mapped height --- a barometric
+implies does not reduce convergence, although it raises the tracking error, but a constant offset between measured and mapped height --- a barometric
 bias, or a radar seeing through a canopy the surface model includes --- defeats the filter beyond
 about 5\,m (E4). Inflating $\sigma_z$ buys tolerance up to about 10\,m; estimating the offset as a
 state is the only remedy at 20\,m but costs acquisition when there is no offset. The obvious next
 step is to treat the offset like the bias in the RBPF: it enters the measurement linearly, so it
 could be marginalised analytically instead of sampled.
 
-\paragraph{Static-parameter impoverishment.} The plain particle filter cannot estimate the INS bias
-(E7): with a nearly static bias, resampling leaves bias values from a few ancestors, and the
-estimate is no better than the prior. Rao-Blackwellisation removes the problem at no extra cost and
-improves tracking from 2\,000 particles. It is the better filter for this model.
+\paragraph{Static-parameter impoverishment.} On the hilly regions the plain particle filter's INS
+bias estimate is no better than the prior, even when the position is right (E7): with a nearly
+static bias, resampling leaves bias values from a few ancestors. Rao-Blackwellisation removes this at
+no extra runtime and improves tracking significantly at 5\,000 particles. It is not a free win,
+though: when the position hypothesis is wrong, the RBPF's exact bias update follows the wrong
+position increments and its bias error becomes much larger than the plain filter's. Once locked on,
+it is the better filter for this model; it does not help acquisition on the hills.
 
 \subsection{How close to optimal?}
-The posterior Cramér--Rao bound is never violated, which checks the whole chain of simulation,
-filters and bound. In the tracking phase the filters are about twice the per-flight bound on the
-hills, and the mismatched-gain analysis shows why: the deliberately inflated process noise
+The ensemble posterior Cramér--Rao bound is never undercut by the unconditional RMSE, which checks
+the whole chain of simulation, filters and bound. In the tracking phase the filters are about twice
+the per-flight bound on the hills, and for the 20\,000-particle PF the mismatched-gain analysis
+shows why: the deliberately inflated process noise
 ($\sigma_p = 2$\,m per step vs.\ a true $\approx0.05$\,m) alone allows only
 \EFivePlanHillPfTwoZeroZeroZeroZeroTuned\,m, and the 20\,000-particle PF reaches
 \EFivePlanHillPfTwoZeroZeroZeroZeroRmse\,m (E5). The inflation is a deliberate trade:
 smaller process noise would track closer to the bound but would make the cloud less diverse during
 acquisition, where E3 shows diversity (roughening) to be what matters. During acquisition the
 bound is not a useful benchmark, because it ignores ambiguity --- which is precisely what makes TAN
-hard; a bound that accounts for ambiguity would be needed there. The NEES behaves accordingly: consistent to conservative in the tracking phase,
-uninformative while the posterior is multimodal.
+hard; a bound that accounts for ambiguity would be needed there. The NEES behaves accordingly:
+conservative (about half the consistent value) in the tracking phase, which the inflated process
+noise explains, and uninformative while the posterior is multimodal.
 
 \subsection{Limitations}\label{sec:limitations}
 \begin{itemize}
@@ -101,6 +110,13 @@ uninformative while the posterior is multimodal.
   \item \textbf{The world uses the same map.} The simulated radar sees the DEM itself unless E4
         adds a map error; real canopy and DSM effects are spatially structured and only
         approximated by a smooth random field and a constant offset.
+  \item \textbf{A plain EKF baseline.} The EKF has no innovation gating and estimates the bias
+        without constraints; a gated or position-only EKF would fail less destructively, so the
+        size of the EKF's failures (worse than dead reckoning) is specific to this baseline, while
+        its early loss of convergence is structural (linearisation).
+  \item \textbf{Per-flight bound.} For a fixed flight path the per-flight PCRB is a local
+        small-error approximation, not a strict bound; only the ensemble bound is a valid lower
+        bound for the reported RMSE.
   \item \textbf{One tuning.} Process and measurement noise were fixed, not optimised per filter;
         the EKF in particular might do somewhat better with different tuning, although its failures
         are structural (linearisation), not a matter of noise levels.

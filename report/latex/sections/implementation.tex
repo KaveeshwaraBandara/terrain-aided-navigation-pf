@@ -7,6 +7,7 @@ over particles anywhere.
 
 \begin{figure}[t]
   \centering
+  \resizebox{\textwidth}{!}{%
   \begin{tikzpicture}[
       box/.style={draw, rounded corners=2pt, align=center, font=\footnotesize,
                   minimum height=9mm, inner sep=3pt},
@@ -25,7 +26,7 @@ over particles anywhere.
     \draw[arr] (filters) -- (runner);
     \draw[arr] (runner) -- (analysis);
     \draw[arr] (metrics) |- (analysis);
-  \end{tikzpicture}
+  \end{tikzpicture}}
   \caption{Package structure and data flow. Every estimator implements the same interface
     (\texttt{initialize}, \texttt{predict}, \texttt{update}, \texttt{estimate}), so the runner
     treats them identically. The report reads only the outputs of \texttt{analysis/}.}
@@ -111,12 +112,18 @@ Because the outputs of a particle filter are random, ``it converges on a test ca
 evidence of correctness. The decisive test uses a terrain for which the exact answer is known: on
 a tilted plane $h(\pv) = 0.05\,p_x + 0.03\,p_y + 200$ the measurement is linear and bilinear
 interpolation is exact, so the EKF \emph{is} the Kalman filter and computes the exact posterior.
-A correct particle filter must agree with it up to Monte Carlo error. Over \ValSeeds{} seeds and
-all 300 steps, the particle filter's estimate never deviates from the Kalman estimate by more than
-\ValPFPosMax{} Kalman standard deviations in position and \ValPFBiasMax{} in bias
-(\cref{tab:validation}); the RBPF, with four times fewer particles, stays within
-\ValRBPFPosMax{} and \ValRBPFBiasMax{} --- a first glimpse of the variance reduction that
-Rao-Blackwellisation promises. On the same plane the PCRB recursion reproduces the Kalman
+A correct particle filter must agree with it up to sampling error. Over \ValSeeds{} seeds and
+all 300 steps (\cref{tab:validation}), the particle filter with 20\,000 particles stays within
+\ValPFPosSecond{} Kalman standard deviations of the Kalman estimate in four of the five seeds, but
+in one seed its position estimate drifts to \ValPFPosMax{} standard deviations and its covariance
+trace to \ValPFTraceLo{} times the Kalman value --- more than the 0.25 tolerance of the
+corresponding unit test, which uses a different seed. In that seed the position deviation follows
+the bias deviation (correlation \ValPFWorstSeedCorr{} over time), and when the bias samples are
+rejuvenated (ten times the bias random walk, in both the particle and the Kalman filter) all seeds
+stay within \ValPFRejuvenatedPosMax. The deviation therefore comes from the impoverishment of the
+nearly static bias samples (\cref{sec:e7}), not from an error in the update. The RBPF, which
+computes the bias exactly, stays within \ValRBPFPosMax{} standard deviations with four times fewer
+particles. On the same plane the PCRB recursion reproduces the Kalman
 covariance to a relative difference of \ValPcrbRelDiff{}. Further unit tests cover the resampling
 schemes (unbiased offspring counts, zero-weight particles never selected, systematic offspring
 equal to $\lfloor N w\rfloor$ or $\lceil N w \rceil$), the likelihoods (normalised densities,

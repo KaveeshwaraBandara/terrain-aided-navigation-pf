@@ -123,13 +123,15 @@ the estimate:
         $R = N - \sum_i \lfloor N w^{(i)} \rfloor$ by multinomial sampling on the residual
         weights.
 \end{itemize}
-All four are implemented by inverting the cumulative weights at sorted pointers $u_j$.
+All four are implemented by inverting the cumulative weights at pointers $u_j$ with a binary
+search (evenly spaced pointers for stratified and systematic, independent uniforms for multinomial
+and the residual step).
 
 \paragraph{Roughening.} Resampling duplicates particles, and with small process noise the cloud
 can collapse to few distinct values (sample impoverishment). Roughening~\cite{gordon1993} adds
 independent jitter after each resampling, with per-component standard deviation
-$\sigma_j = K E_j N^{-1/d}$, where $E_j$ is the range of component $j$ over the particles, $d = 4$
-the state dimension and $K$ a tuning constant.
+$\sigma_j = K E_j N^{-1/d}$, where $E_j$ is the range of component $j$ over the particles, $d$
+the state dimension (4; 5 with the offset state of E4) and $K$ a tuning constant.
 
 \subsection{Extended Kalman filter baseline}\label{sec:ekf}
 The EKF approximates the posterior by a Gaussian $\Normal(\hat\xv_k, P_k)$. Because the motion model
@@ -161,8 +163,9 @@ by a Student-$t$ density with scale $\sigma_z$ and $\nu$ degrees of freedom,
   - \tfrac{\nu+1}{2}\log\!\left(1 + \frac{(z - h(\pv))^2}{\nu\sigma_z^2}\right),
   \label{eq:studentt}
 \end{equation}
-makes the log-likelihood grow only logarithmically with the residual, so one outlier costs
-a few units instead of hundreds and the particles near the truth survive. For small residuals
+makes the log-likelihood grow only logarithmically with the residual, so a 100\,m outlier costs
+about 13 units of log-likelihood (for $\nu = 4$) instead of about 386, and the particles near the
+truth survive. For small residuals
 the core of \eqref{eq:studentt} is close to the Gaussian, so little accuracy is lost when there
 are no outliers. The constants are kept so that the log evidence of the two models can be
 compared; $\nu = 4$ is used.
@@ -177,7 +180,8 @@ predictive distribution,
   \hat z_k = \sum_i w_{k-1}^{(i)} h(\pv_k^{(i)}),\quad
   S_k = \sum_i w_{k-1}^{(i)} \bigl(h(\pv_k^{(i)}) - \hat z_k\bigr)^2 + \sigma_z^2 .
 \end{equation}
-For a filter consistent with the data, $\mathrm{NIS}_k$ is approximately $\chi^2_1$, so the sum
+($S_k$ uses $\sigma_z^2$ also when the Student-$t$ likelihood is selected.) For a filter
+consistent with the data, $\mathrm{NIS}_k$ is approximately $\chi^2_1$, so the sum
 over a window of $L$ steps is approximately $\chi^2_L$; the monitor raises an alarm when the
 windowed mean exceeds $\chi^2_L(1 - p_{\mathrm{FA}})/L$. During acquisition the cloud is wide,
 $S_k$ is large and the NIS stays small, so the monitor is naturally quiet there. On an alarm the
@@ -224,7 +228,11 @@ measurement \eqref{eq:meas} it becomes
   \label{eq:pcrb}
 \end{equation}
 where the Jacobian is evaluated at the \emph{true} state and the expectation is over the
-distribution of the true state. The first term is the Kalman prediction of the information; the
+distribution of the true state. Here $\nabla h$ is the exact gradient of the bilinear interpolant
+--- the surface the simulated altimeter measures --- whereas the EKF uses smoothed
+central-difference slopes; the smoothed slopes would understate the information by a factor of
+\TerrHillGradRatio{} (hill country), \TerrKandyGradRatio{} (Kandy) and \TerrPlainsGradRatio{}
+(plains). The first term is the Kalman prediction of the information; the
 second is the information the altimeter adds, $\nabla h \nabla h\trans / R$: steep terrain is
 informative, and only along the slope direction. Bergman applied this bound to terrain
 navigation~\cite{bergman1999thesis}. For a linear-Gaussian model \eqref{eq:pcrb} is exactly the
@@ -246,8 +254,9 @@ the simulator's noise.
 \paragraph{Which expectation.} Two versions are computed. (i) The \emph{ensemble bound}: the
 expectation in \eqref{eq:pcrb} is the average over the true trajectories of all Monte Carlo
 runs. Flights are placed uniformly at random, so given the initial guess the true start is
-distributed exactly as the filters' prior $\Normal(\hat\pv_0, \sigma_0^2 I)$, and this bound applies to
-the ensemble RMSE the experiments report. (ii) The \emph{per-flight bound}: $H_k$ along one fixed
+distributed approximately as the filters' prior $\Normal(\hat\pv_0, \sigma_0^2 I)$ (exactly, apart
+from the truncation by the box in which starts are drawn), and this bound applies to the ensemble
+RMSE the experiments report. (ii) The \emph{per-flight bound}: $H_k$ along one fixed
 flight path, compared with the tracking error of runs that fly that path. Because the bound only
 involves the slope at the true position, it ignores ambiguity --- other places with the same
 height profile. It describes a filter that already knows which hill it is over, so it should be
@@ -267,8 +276,8 @@ regions were chosen by measured terrain statistics with a rule fixed in advance
 the elevation range and standard deviation; the slope $|\nabla h|$ in percent; the
 \emph{roughness}, the standard deviation of elevation inside a moving $1\times1$\,km window,
 averaged over the region; and the \emph{Fisher information density}
-$\Exp[|\nabla h|^2]/\sigma_z^2$, the average position information one altimeter measurement adds
-(\cref{eq:pcrb}).
+$\Exp[|\nabla h|^2]/\sigma_z^2$ with the gradient of the bilinear interpolant, the average position
+information one altimeter measurement adds (\cref{eq:pcrb}).
 
 \subsection{Evaluation methodology}\label{sec:eval}
 \paragraph{Monte Carlo with common random numbers.} Every result is an average over $M$ Monte
@@ -276,7 +285,11 @@ Carlo runs. Run $i$ draws its flight (random start, heading and weave phase), IN
 altimeter noise, outliers, map error and initial-guess direction from separate named random
 streams seeded by $i$, with fixed-size draws. Every filter and every configuration therefore
 sees exactly the same flights and noise: differences between estimators are paired, and a
-parameter change alters nothing but what it scales.
+parameter change alters nothing but what it scales. Because a flight depends only on the seed,
+the region and the run index, this also holds \emph{across} experiments: run $i$ on a region flies
+the same flight in E1, E2, E4 and the E6 test, so those experiments reuse subsets of E1's flights;
+the filters' random streams depend on the run index too, so identical configurations reproduce
+identical runs (the plain PF's runs in the E6 test are exactly E1's).
 
 \paragraph{Metrics.} A run has \emph{converged} if its position error stays below 50\,m
 throughout at least the final 100\,s; it is a \emph{false lock} if the final error exceeds

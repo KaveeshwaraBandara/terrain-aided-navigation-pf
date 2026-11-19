@@ -85,8 +85,45 @@ class DEM:
         return self._interp(self.elevation, x, y)
 
     def gradient(self, x, y) -> tuple[np.ndarray, np.ndarray]:
-        """Terrain slope (dh/dx, dh/dy) in m/m — the EKF measurement Jacobian needs this."""
+        """Smoothed terrain slope (dh/dx, dh/dy) in m/m: central differences on the grid,
+        bilinearly interpolated. Used as the EKF's measurement Jacobian (a smooth Jacobian is
+        the usual choice for a linearised filter)."""
         return self._interp(self._dhdx, x, y), self._interp(self._dhdy, x, y)
+
+    def bilinear_gradient(self, x, y) -> tuple[np.ndarray, np.ndarray]:
+        """Exact gradient of the bilinear interpolant :meth:`height` — the measurement
+        function the simulated altimeter actually sees. Used by the PCRB and the terrain
+        information statistics. Piecewise linear within a cell; outside the grid the
+        clamped interpolant is flat, so the gradient is 0 there."""
+        x, y = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
+        h, w = self.shape
+        r = (self.y0 - y) / self.res
+        c = (x - self.x0) / self.res
+        r0 = np.clip(np.floor(r).astype(int), 0, h - 2)
+        c0 = np.clip(np.floor(c).astype(int), 0, w - 2)
+        fr = np.clip(r - r0, 0.0, 1.0)
+        fc = np.clip(c - c0, 0.0, 1.0)
+        e = self.elevation
+        h00, h01 = e[r0, c0], e[r0, c0 + 1]
+        h10, h11 = e[r0 + 1, c0], e[r0 + 1, c0 + 1]
+        dh_dc = (1 - fr) * (h01 - h00) + fr * (h11 - h10)
+        dh_dr = (1 - fc) * (h10 - h00) + fc * (h11 - h01)
+        inside_c = (c >= 0) & (c <= w - 1)
+        inside_r = (r >= 0) & (r <= h - 1)
+        gx = np.where(inside_c, dh_dc, 0.0) / self.res
+        gy = -np.where(inside_r, dh_dr, 0.0) / self.res  # rows grow southward
+        return gx, gy
+
+    def mean_squared_bilinear_gradient(self) -> float:
+        """E|∇h|² of the bilinear interpolant over the whole grid, exactly (cell by cell:
+        each component is linear across the cell, so the mean of its square over the cell is
+        (a² + ab + b²)/3 for end values a, b)."""
+        e, res = self.elevation, self.res
+        a = (e[:-1, 1:] - e[:-1, :-1]) / res  # dh/dx along the top edge of each cell
+        b = (e[1:, 1:] - e[1:, :-1]) / res  # ... along the bottom edge
+        c = (e[1:, :-1] - e[:-1, :-1]) / res  # dh/dy (sign irrelevant) on the left edge
+        d = (e[1:, 1:] - e[:-1, 1:]) / res  # ... on the right edge
+        return float(np.mean((a * a + a * b + b * b) / 3 + (c * c + c * d + d * d) / 3))
 
     # ------------------------------------------------------------------ constructors
     @classmethod

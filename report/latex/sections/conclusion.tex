@@ -6,28 +6,32 @@ experiments. The main conclusions are:
 
 \begin{enumerate}
   \item \textbf{The particle filter is the right tool, and real terrain makes the case more
-        strongly than synthetic terrain.} The EKF's local linearisation breaks down at initial
-        errors of about 100\,m over real hills (\EOneHillSOneZeroZeroEkfConv\,\% convergence) and
-        then performs worse than no terrain aiding, while the particle filter converges reliably up
-        to about 1\,km (\EOneHillSOneZeroZeroZeroPfTwoZeroZeroZeroZeroConv\,\% with 20\,000 particles)
-        and tracks at \EOneHillSFiveZeroZeroPfTwoZeroZeroZeroZeroTrack--\EOneKandySFiveZeroZeroPfTwoZeroZeroZeroZeroTrack\,m
+        strongly than synthetic terrain.} Over real hills the EKF already locks falsely in
+        \EOneHillSOneZeroZeroEkfFl\,\% of runs at 100\,m initial error and converges in only
+        \EOneHillSFiveZeroZeroEkfConv\,\% at 500\,m (synthetic hills:
+        \EOneSynthSFiveZeroZeroEkfConv\,\%); this ungated EKF then ends worse than dead reckoning.
+        With 20\,000 particles the particle filter still converges in
+        \EOneHillSOneZeroZeroZeroPfTwoZeroZeroZeroZeroConv\,\% of the runs at 1\,km and tracks at
+        \EOneHillSFiveZeroZeroPfTwoZeroZeroZeroZeroTrack--\EOneKandySFiveZeroZeroPfTwoZeroZeroZeroZeroTrack\,m
         over the hills.
-  \item \textbf{Terrain decides what is possible.} Performance follows the terrain information
-        under the flight, for regions and for individual flights; over flat plains the particle
-        filter stays honestly uncertain instead of locking falsely.
+  \item \textbf{Terrain decides what is possible.} Performance follows the terrain information,
+        strongly between terrain types and weakly between flights over the same hilly region; over
+        flat plains the particle filter stays honestly uncertain instead of locking falsely.
   \item \textbf{False lock is the failure to design against.} More particles help, but roughening
-        and a divergence monitor that needs no ground truth are cheaper and complementary; together
-        they reach \ESixHillSTwoZeroZeroZeroPfMonitorRoughConv\,\% convergence at 2\,km initial
-        uncertainty with 5\,000 particles. The resampling scheme and the ESS threshold, by
-        contrast, hardly matter.
-  \item \textbf{Robustness and efficiency.} A Student-$t$ likelihood removes the sensitivity to
-        altimeter outliers at no cost; constant map or altimeter offsets above about 10\,m remain
-        the most damaging model error; Rao-Blackwellising the INS bias fixes the plain filter's
-        inability to estimate it at no extra cost.
-  \item \textbf{How far from optimal.} The filters never undercut the posterior Cramér--Rao
-        bound; in the tracking phase they stay about twice above it, almost entirely because of
-        their deliberately inflated process noise --- a trade made for robust acquisition, where
-        the bound, blind to ambiguity, is not informative.
+        and a divergence monitor that needs no ground truth are complementary and reach
+        \ESixHillSTwoZeroZeroZeroPfMonitorRoughConv\,\% convergence at 2\,km initial uncertainty
+        with 5\,000 particles. The resampling scheme and the ESS threshold, by contrast, made no
+        significant difference.
+  \item \textbf{Robustness and efficiency.} A Student-$t$ likelihood removes most of the
+        sensitivity to (zero-mean, 100\,m) altimeter outliers at no cost; constant map or altimeter
+        offsets of 10\,m and more remain the most damaging model error; Rao-Blackwellising the INS
+        bias fixes the plain filter's impoverished bias estimate once the position is locked on,
+        at no extra runtime.
+  \item \textbf{How far from optimal.} The unconditional error never undercuts the ensemble
+        posterior Cramér--Rao bound; in the tracking phase the 20\,000-particle filter stays about
+        twice above the per-flight bound, almost entirely because of its deliberately inflated
+        process noise --- a trade made for robust acquisition, where the bound, blind to ambiguity,
+        is not informative.
 \end{enumerate}
 
 Every number, table and figure in this report is regenerated from saved results by scripts in the

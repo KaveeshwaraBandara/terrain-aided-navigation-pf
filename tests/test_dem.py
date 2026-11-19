@@ -70,3 +70,32 @@ def test_reproject_geographic_to_utm(tmp_path):
     lon, lat = 80.545, 7.355
     (x,), (y,) = warp_transform("EPSG:4326", UTM_44N, [lon], [lat])
     assert abs(float(dem.height(x, y)) - (100.0 + 1000.0 * (lon - west))) < 1.0
+
+
+def test_bilinear_gradient_matches_numerical_derivative(synthetic_dem, rng):
+    dem = synthetic_dem
+    xmin, xmax, ymin, ymax = dem.bounds
+    x = rng.uniform(xmin + 50, xmax - 50, 500)
+    y = rng.uniform(ymin + 50, ymax - 50, 500)
+    eps = 1e-3
+    gx, gy = dem.bilinear_gradient(x, y)
+    nx = (dem.height(x + eps, y) - dem.height(x - eps, y)) / (2 * eps)
+    ny = (dem.height(x, y + eps) - dem.height(x, y - eps)) / (2 * eps)
+    np.testing.assert_allclose(gx, nx, atol=1e-6)
+    np.testing.assert_allclose(gy, ny, atol=1e-6)
+
+
+def test_bilinear_gradient_on_a_plane(rng):
+    dem, (a, b, _) = plane_dem()
+    gx, gy = dem.bilinear_gradient(rng.uniform(100, 2900, 50), rng.uniform(100, 2900, 50))
+    np.testing.assert_allclose(gx, a, atol=1e-9)
+    np.testing.assert_allclose(gy, b, atol=1e-9)
+
+
+def test_mean_squared_bilinear_gradient_matches_sampling(synthetic_dem, rng):
+    dem = synthetic_dem
+    xmin, xmax, ymin, ymax = dem.bounds
+    gx, gy = dem.bilinear_gradient(
+        rng.uniform(xmin, xmax, 400_000), rng.uniform(ymin, ymax, 400_000)
+    )
+    assert dem.mean_squared_bilinear_gradient() == pytest.approx(np.mean(gx**2 + gy**2), rel=0.02)
