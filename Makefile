@@ -4,7 +4,7 @@ BIN  := $(VENV)/bin
 JOBS ?= 10
 EXPERIMENTS := e1 e1@synth e2 e3 e4 e5 e6 e7
 
-.PHONY: setup test lint format data survey terrain run demo experiments quick smoke figures \
+.PHONY: setup test lint format data survey terrain run demo media experiments quick smoke figures \
         benchmark visuals report clean
 
 setup:            ## create .venv and install the package + dev tools
@@ -38,6 +38,13 @@ run:              ## quick-look run of configs/default.yaml (synthetic terrain)
 
 demo:             ## live animated window: particle cloud, truth and estimates over the terrain
 	$(BIN)/python scripts/live_demo.py
+
+media:            ## README animations in assets/ (live demo rendered to video, then GIF; needs ffmpeg)
+	@mkdir -p results/media assets
+	$(BIN)/python scripts/live_demo.py --save results/media/demo.mp4
+	$(BIN)/python scripts/live_demo.py --sigma0 1000 --run 0 --save results/media/false_lock.mp4
+	ffmpeg -loglevel error -y -t 6 -i results/media/demo.mp4 -vf "fps=7,scale=720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:reserve_transparent=0[p];[b][p]paletteuse=dither=none" assets/demo.gif
+	ffmpeg -loglevel error -y -t 6 -i results/media/false_lock.mp4 -vf "fps=7,scale=720:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128:reserve_transparent=0[p];[b][p]paletteuse=dither=none" assets/false_lock.gif
 
 experiments:      ## every experiment, full size (resumable; logs in results/<exp>.log)
 	@for e in $(EXPERIMENTS); do \
