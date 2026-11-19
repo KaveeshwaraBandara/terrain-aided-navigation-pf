@@ -72,6 +72,20 @@ report/             latex/ (report), figures/, tables/, generated/ (macros), fin
                     WALKTHROUGH.md
 ```
 
+## See it run
+
+```bash
+make demo                                                   # live window, hill country, σ₀ = 500 m
+.venv/bin/python scripts/live_demo.py --sigma0 1000 --run 0 # a false lock onto the wrong terrain
+.venv/bin/python scripts/live_demo.py --region north_central_plains --sigma0 2000
+.venv/bin/python scripts/live_demo.py --region synthetic    # no download needed
+```
+
+The window shows the particle cloud, the true path and the dead-reckoning, EKF and particle-filter
+estimates moving over the hillshaded terrain, with each filter's position error beside it. `--run N`
+replays flight N of the Monte Carlo experiments; `--save demo.mp4` writes a video instead.
+`scripts/run_experiment.py` saves static plots of one or more flights to `results/<timestamp>_<region>/`.
+
 ## Setup and full reproduction
 
 Requires Python ≥ 3.10 (Ubuntu 24.04 ships 3.12; install `python3-venv` if `venv` is missing).

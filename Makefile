@@ -4,7 +4,7 @@ BIN  := $(VENV)/bin
 JOBS ?= 10
 EXPERIMENTS := e1 e1@synth e2 e3 e4 e5 e6 e7
 
-.PHONY: setup test lint format data survey terrain run experiments quick smoke figures \
+.PHONY: setup test lint format data survey terrain run demo experiments quick smoke figures \
         benchmark visuals report clean
 
 setup:            ## create .venv and install the package + dev tools
@@ -35,6 +35,9 @@ terrain:          ## terrain statistics table + overview figure
 
 run:              ## quick-look run of configs/default.yaml (synthetic terrain)
 	$(BIN)/python scripts/run_experiment.py --config configs/default.yaml
+
+demo:             ## live animated window: particle cloud, truth and estimates over the terrain
+	$(BIN)/python scripts/live_demo.py
 
 experiments:      ## every experiment, full size (resumable; logs in results/<exp>.log)
 	@for e in $(EXPERIMENTS); do \
