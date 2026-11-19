@@ -3,6 +3,19 @@
 Running record of results and observations, to draw on when writing the report.
 Newest first. Every number says which terrain, how many runs and which settings produced it.
 
+## Machine (all runtimes in the report refer to this)
+
+| | |
+|---|---|
+| CPU | 13th Gen Intel Core i7-13620H — 10 cores (6 performance + 4 efficiency), 16 threads, max 4.9 GHz, 24 MiB L3 |
+| RAM | 16 GB (15.3 GiB usable) |
+| OS | Ubuntu 24.04.5 LTS, Linux 7.0.0 |
+| Python / libraries | Python 3.12.3, NumPy 2.5.4, SciPy 1.18.1, Matplotlib 3.11.2, rasterio 1.5.2 |
+
+Laptop, mains power. Per-step runtimes are measured single-process with BLAS threads = 1
+(`scripts/benchmark.py`), never inside the parallel sweeps: on this hybrid CPU a worker's
+per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory bandwidth.
+
 ---
 
 ## 2026-11-04 — Filters implemented and validated (synthetic terrain)
