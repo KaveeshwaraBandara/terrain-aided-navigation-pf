@@ -1,3 +1,5 @@
+> Superseded: the report is `report/latex/main.tex`. This was the initial outline.
+
 # Report outline
 
 Structure follows the assignment brief (introduction, methodology, implementation,

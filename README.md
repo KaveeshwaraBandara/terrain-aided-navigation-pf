@@ -102,19 +102,47 @@ overridden: `python scripts/run_experiment.py --set particle_filter.n_particles=
 `report/{figures,tables,generated}/`. Without a local TeX installation, upload the whole
 `report/` folder to Overleaf and compile `latex/main.tex` (pdfLaTeX + BibTeX, standard packages).
 
+## Results
+
+![Convergence and false lock vs initial uncertainty](report/figures/e1_rates.png)
+
+**E1 — hill country, 300 random flights per cell:** converged runs (false-lock runs in brackets)
+against the initial position uncertainty σ₀ (`report/tables/e1_convergence.csv`):
+
+| σ₀ | EKF | PF, N = 5 000 | PF, N = 20 000 |
+|---|---|---|---|
+| 100 m | 85 % (15 %) | 100 % (0 %) | 100 % (0 %) |
+| 500 m | 28 % (70 %) | 95 % (3 %) | 98 % (1 %) |
+| 1000 m | 14 % (84 %) | 72 % (25 %) | 92 % (6 %) |
+| 2000 m | 6 % (93 %) | 40 % (54 %) | 70 % (29 %) |
+
+- On real 30 m terrain the EKF's linearisation fails already at σ₀ = 100 m (on smooth synthetic
+  hills it held up to 1 km), and once it fails it ends worse than dead reckoning.
+- Rougher terrain under a flight lowers the PF's error (Spearman −0.63) and raises the EKF's (+0.29).
+- False lock is the PF's failure mode; at σ₀ = 2 km a divergence monitor (no ground truth) plus
+  roughening raise convergence from 40 % to 96 % with 5 000 particles
+  (`report/tables/e6_test.csv`).
+- A Student-t likelihood makes the PF immune to radar outliers; the Rao-Blackwellised PF
+  estimates the INS bias that the plain PF cannot; in the tracking phase the filters stay ≈ 2×
+  above the posterior Cramér–Rao bound, almost entirely because of their inflated process noise.
+
+Full report: `report/latex/` (Overleaf-ready); running lab notebook: `report/findings.md`;
+guide to the code, figures and likely questions: `report/WALKTHROUGH.md`.
+
 ## Roadmap
 
 - [x] Resampling: ESS, multinomial, systematic, stratified, residual (`filters/resampling.py`)
 - [x] Particle filter: predict, update, estimate, roughening (`filters/particle_filter.py`)
 - [x] EKF baseline: predict, update (`filters/ekf.py`)
-- [ ] Download the three regions and sanity-check the hillshades
-- [ ] Experiment 1 — PF vs EKF vs dead reckoning, increasing initial uncertainty
-- [ ] Experiment 2 — hill country vs rolling vs flat terrain
-- [ ] Experiment 3 — particle count vs RMSE vs runtime; resampling scheme comparison
-- [ ] Experiment 4 — robustness: altimeter outliers (Student-t likelihood), canopy bias
-- [ ] Experiment 5 — Monte Carlo consistency (NEES), particle-cloud figures
-- [ ] Stretch — Rao-Blackwellised PF (Kalman filter per particle for the bias states)
-- [ ] Report (`report/outline.md`; running results in `report/findings.md`)
+- [x] Real terrain: three regions chosen by a pre-registered rule, downloaded with checksums
+- [x] Experiment 1 — PF vs EKF vs dead reckoning, increasing initial uncertainty
+- [x] Experiment 2 — terrain informativeness per flight
+- [x] Experiment 3 — particle count, resampling scheme, ESS threshold, roughening
+- [x] Experiment 4 — robustness: altimeter outliers (Student-t), map error / offset, INS grade
+- [x] Experiment 5 — consistency (ANEES) and the posterior Cramér–Rao bound
+- [x] Experiment 6 — false-lock detection and recovery
+- [x] Experiment 7 — Rao-Blackwellised PF
+- [x] Report (`report/latex/`; running results in `report/findings.md`)
 
 ## Data attribution
 

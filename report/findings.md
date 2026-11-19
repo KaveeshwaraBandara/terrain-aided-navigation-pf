@@ -18,6 +18,21 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — M4: report and documentation
+
+- `report/latex/` is complete and Overleaf-ready (no local TeX by the owner's choice). In place of
+  a compile, `scripts/check_report.py` checks that every generated-number macro is defined, every
+  reference, input, figure, listing and citation resolves, every bib entry is cited, braces and
+  environments balance, generated tables contain no bare % or _ and no unsupported Unicode, and
+  listings are ASCII. It passes with 0 problems.
+- Length estimate (not measured — no compile): ≈ 9 800 words of body text with 15 figures,
+  7 tables and 4 listings ≈ 25–28 pages; three secondary figures were moved to the appendix to
+  stay near the 15–25-page guideline.
+- Every result number in the text is a macro from `report/generated/`; regenerating all outputs
+  (`make figures`, 48 s) leaves every figure byte-identical.
+
+---
+
 ## 2026-11-19 — E6 test (main seeds, M = 300 per cell): monitor, roughening and both
 
 Settings fixed before this run (dev study + E3): window 20, p_FA = 0.001, α = 0.5; K = 0.05.

@@ -138,13 +138,6 @@ is between terrain types rather than between flights over the same type. Binned 
 information collected along the flight (\cref{fig:e2binned}), the PF's convergence rate rises
 from about one half on the least informative flights to over 90\,\% on the hills.
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=0.62\textwidth]{e2_binned.pdf}
-  \caption{E2: convergence against the terrain information along the flight (eight equal-count
-    bins pooled over the three regions; Wilson 95\,\% intervals). No flight falls between the
-    plains and the hills, hence the gap.}\label{fig:e2binned}
-\end{figure}
 
 Decomposing the tracking error into along- and cross-track components (\cref{tab:e2}) shows no
 systematic anisotropy: the PF's along/cross RMS is \ETwoHillPfFiveZeroZeroZeroAlong{}/%
@@ -292,12 +285,6 @@ converges in \EFourInsGradeHillZeroPointOnePfFiveZeroZeroZeroConv,
 \EFourInsGradeHillOneEkfConv\,\%) and its tracking error grows with the bias
 (\cref{fig:e4ins}): a poor INS makes the terrain do more of the work.
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\textwidth]{e4_ins_grade.pdf}
-  \caption{E4: INS grade (initial velocity-bias std per axis); $M = \EFourRuns$. Dead reckoning
-    never converges and is omitted.}\label{fig:e4ins}
-\end{figure}
 
 \begin{table}[t]
   \centering\small
@@ -457,12 +444,6 @@ tracking RMSE is lower (\ESevenHillRbpfNFiveZeroZeroZeroTrack{} vs.\
 the advantage disappears: each particle's bias filter is then driven by few, noisy position
 increments.
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\textwidth]{e7_equal_runtime.pdf}
-  \caption{E7: convergence against runtime per step (single-core benchmark); $M = \ESevenRuns$.}
-  \label{fig:e7rt}
-\end{figure}
 
 \subsection{Illustration}\label{sec:illustration}
 \Cref{fig:snapshots,fig:trajectory} show one run, chosen by a fixed rule rather than by eye: the
