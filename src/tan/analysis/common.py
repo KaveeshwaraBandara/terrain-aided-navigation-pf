@@ -183,3 +183,13 @@ def yerr(y, lo, hi) -> list[np.ndarray]:
     error above the point estimate)."""
     y, lo, hi = (np.asarray(a, dtype=float) for a in (y, lo, hi))
     return [np.maximum(y - lo, 0.0), np.maximum(hi - y, 0.0)]
+
+
+def plain_log_ticks(ax, which: str, ticks=(1, 2, 3, 5, 10, 20, 30, 50, 100, 200, 500)) -> None:
+    """Plain-number ticks on a log axis (instead of 2×10⁰ style labels)."""
+    lo, hi = ax.get_xlim() if which == "x" else ax.get_ylim()
+    t = [v for v in ticks if lo <= v <= hi]
+    axis = ax.xaxis if which == "x" else ax.yaxis
+    axis.set_ticks(t)
+    axis.set_ticklabels([f"{v:g}" for v in t])
+    axis.set_minor_locator(__import__("matplotlib").ticker.NullLocator())

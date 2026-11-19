@@ -72,3 +72,28 @@ def test_true_noise_matches_simulator(cfg, synthetic_dem):
 def test_rmse_bound_shape():
     b = np.tile(np.diag([9.0, 16.0, 0.0, 0.0]), (3, 1, 1))
     np.testing.assert_allclose(position_rmse_bound(b), 5.0)
+
+
+def test_mismatched_kf_equals_pcrb_when_models_match():
+    from tan.pcrb import mismatched_kf_error
+
+    Q = np.diag([0.01, 0.01, 1e-6, 1e-6])
+    P0 = np.diag([200.0**2] * 2 + [0.3**2] * 2)
+    slopes = np.tile([0.05, 0.03], (100, 1))
+    G = slopes[:, :, None] * slopes[:, None, :]
+    a = mismatched_kf_error(slopes, P0, Q, 13.0, Q, 13.0, 1.0)
+    np.testing.assert_allclose(a, pcrb(G, P0, Q, 13.0, 1.0), rtol=1e-8, atol=1e-10)
+
+
+def test_mistuned_kf_is_worse_than_the_bound():
+    from tan.pcrb import mismatched_kf_error
+
+    Qt = np.diag([0.0025, 0.0025, 4e-6, 4e-6])
+    Qf = np.diag([4.0, 4.0, 4e-6, 4e-6])
+    P0 = np.diag([200.0**2] * 2 + [0.3**2] * 2)
+    rng = np.random.default_rng(0)
+    slopes = rng.normal(0.0, 0.2, size=(200, 2))
+    G = slopes[:, :, None] * slopes[:, None, :]
+    a = position_rmse_bound(mismatched_kf_error(slopes, P0, Qf, 13.0, Qt, 13.0, 1.0))
+    b = position_rmse_bound(pcrb(G, P0, Qt, 13.0, 1.0))
+    assert np.all(a[50:] >= b[50:] - 1e-9) and a[-1] > 1.2 * b[-1]

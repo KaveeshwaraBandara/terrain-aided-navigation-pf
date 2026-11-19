@@ -86,3 +86,40 @@ def pcrb(
 def position_rmse_bound(bound_cov: np.ndarray) -> np.ndarray:
     """√trace of the position block: lower bound on the position RMSE, per step."""
     return np.sqrt(bound_cov[:, 0, 0] + bound_cov[:, 1, 1])
+
+
+def mismatched_kf_error(
+    slopes: np.ndarray,
+    P0: np.ndarray,
+    Q_filter: np.ndarray,
+    R_filter: float,
+    Q_true: np.ndarray,
+    R_true: float,
+    dt: float,
+) -> np.ndarray:
+    """Actual error covariance of a Kalman filter that knows the true terrain slopes along the
+    path (``slopes`` (K, 2)) but computes its gains with its own tuning (Q_filter, R_filter),
+    while the world has (Q_true, R_true):
+
+        believed:  P⁻ = F P Fᵀ + Q_f,   K = P⁻Hᵀ / (H P⁻ Hᵀ + R_f),   P = (I − KH) P⁻
+        actual:    A⁻ = F A Fᵀ + Q_t,   A = (I − KH) A⁻ (I − KH)ᵀ + K R_t Kᵀ
+
+    With matched models this is the PCRB recursion (Kalman covariance); with the filters'
+    inflated process noise it is the small-error performance their tuning allows.
+    """
+    F = transition(dt)
+    P = np.array(P0, dtype=float)
+    A = np.array(P0, dtype=float)
+    out = np.empty((len(slopes), 4, 4))
+    eye = np.eye(4)
+    for k, g in enumerate(slopes):
+        H = np.array([[g[0], g[1], 0.0, 0.0]])
+        P = F @ P @ F.T + Q_filter
+        A = F @ A @ F.T + Q_true
+        S = float((H @ P @ H.T)[0, 0]) + R_filter
+        K = P @ H.T / S
+        IKH = eye - K @ H
+        P = IKH @ P
+        A = IKH @ A @ IKH.T + R_true * (K @ K.T)
+        out[k] = A
+    return out

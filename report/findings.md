@@ -18,6 +18,38 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — E5: consistency and the posterior Cramér–Rao bound
+
+Ensemble part (from the E1 runs, M = 300 per cell) and per-flight part (5 fixed flight plans per
+region, M = 100 each, σ₀ = 500 m).
+- **The bound is never violated:** the all-run RMSE is ≥ 1.10 × the ensemble PCRB at every
+  step, for every region, σ₀ and filter (sanity check of the whole chain).
+- **Ambiguity dominates the all-run error:** with false locks in the ensemble, the all-run RMSE in
+  the tracking window is 37–756 × the bound on the hilly regions for σ₀ ≥ 500 m; at σ₀ = 100 m
+  (no false locks) the PF is at 2.3× (hill) and 1.2× (plains) — the BCRB ignores which-hill
+  ambiguity and is tight only once the filter is on the right hill.
+- **Consistency:** in the tracking window of converged runs the PF's position ANEES is 0.95–1.9
+  (95 % interval ≈ [1.8, 2.2]): consistent to conservative, as expected from its inflated process
+  noise; 94–96 % of single-run NEES values lie inside the χ²₂ 95 % interval. Over all runs ANEES
+  reaches 10¹³–10¹⁶ — false locks (tight wrong clouds) make the covariance meaningless. During
+  acquisition even eventually-converging runs have ANEES ≫ 2: while most weight sits on a wrong
+  mode and a few particles remain near the truth, the weighted covariance (≈ 50 m) understates
+  the error (≈ 500 m). A Gaussian consistency measure does not fit a multimodal posterior.
+- **Per-flight bound (hills):** converged PF 20 000 tracks at 1.9× (hill) / 2.0× (Kandy) the
+  per-flight PCRB (medians over plans), PF 5 000 at 2.2× / 2.2×, EKF at 2.9× / 2.7×.
+  **Why the gap — tested, not assumed:** a Kalman filter that knows the true slopes along the
+  path but uses the PF's tuning (σ_p = 2 m/step instead of the true ≈ 0.05 m, σ_z = 3.6 m) has an
+  actual tracking RMSE of 6.3 / 6.7 m (mismatched-gain recursion, `tan.pcrb.mismatched_kf_error`)
+  — and PF 20 000 achieves 7.0 / 7.4 m, i.e. **1.05 / 1.07 × what its tuning allows**. Nearly the
+  whole factor ≈ 2 to the PCRB is the deliberate process-noise inflation, not the particle
+  approximation; PF 5 000 adds ≈ 20 % Monte Carlo error, the EKF 40–60 % (it linearises at its
+  estimate, not at the truth).
+- **Plains:** the conditional (converged-only) RMSE is *below* the bound (ratios 0.6–0.9). Not a
+  violation: the bound (25–36 m) is comparable to the 50 m convergence threshold, so selecting
+  runs with error < 50 m truncates the error distribution. The unconditional check above holds.
+
+---
+
 ## 2026-11-19 — E4: robustness to model mismatch (hill country + Kandy, σ₀ = 500 m, M = 100)
 
 Converged % (hill / Kandy):

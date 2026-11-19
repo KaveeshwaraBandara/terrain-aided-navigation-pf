@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import yaml
 from matplotlib.figure import Figure
 
 from ..experiment import build_dem
 from ..metrics import anees_bounds, nees_in_bounds_fraction
-from ..pcrb import pcrb, position_rmse_bound, slope_outer, true_noise
+from ..pcrb import mismatched_kf_error, pcrb, position_rmse_bound, slope_outer, true_noise
 from ..plotting import INK, MUTED, TEXT_WIDTH_IN, report_style, save_report, style_of
 from ..runner import results_dir
 from .common import (
@@ -19,6 +20,7 @@ from .common import (
     fmt,
     load_summary,
     macro_name,
+    plain_log_ticks,
     regions_in,
     series,
 )
@@ -59,6 +61,24 @@ def bound_for(cfg: dict, truth: np.ndarray, dem) -> np.ndarray:
     P0 = np.diag([s0**2, s0**2, b0**2, b0**2])
     G = slope_outer(dem, truth).mean(axis=0)
     return position_rmse_bound(pcrb(G, P0, Q, R, float(cfg["simulation"]["dt"])))
+
+
+def tuned_floor(cfg: dict, path: np.ndarray, dem) -> np.ndarray:
+    """Actual RMSE (per step) of a Kalman filter that knows the true slopes along ``path``
+    (K, 2) but uses the particle filter's tuning (inflated sigma_p, sigma_z): what that tuning
+    allows in the small-error regime (see tan.pcrb.mismatched_kf_error)."""
+    Qt, Rt = true_noise(cfg["simulation"])
+    pf = cfg["particle_filter"]
+    sp, sb = float(pf["process_sigma_pos"]), float(pf["process_sigma_bias"])
+    Qf = np.diag([sp**2, sp**2, sb**2, sb**2])
+    Rf = float(pf["meas_sigma"]) ** 2
+    s0 = float(cfg["init"]["position_sigma"])
+    b0 = float(cfg["simulation"]["ins"]["bias_sigma0"])
+    P0 = np.diag([s0**2, s0**2, b0**2, b0**2])
+    gx, gy = dem.gradient(path[:, 0], path[:, 1])
+    dt = float(cfg["simulation"]["dt"])
+    A = mismatched_kf_error(np.column_stack([gx, gy]), P0, Qf, Rf, Qt, Rt, dt)
+    return position_rmse_bound(A)
 
 
 def make(exp: str = "e5", quick: bool = False) -> None:
@@ -290,6 +310,8 @@ def make(exp: str = "e5", quick: bool = False) -> None:
             assert np.allclose(truth, truth[0]), "plan runs must share the flight"
             bound = bound_for(cfg, truth[:1], dems[region])
             b = float(np.sqrt(np.mean(bound[win] ** 2)))
+            bf = tuned_floor(cfg, truth[0], dems[region])
+            b_filt = float(np.sqrt(np.mean(bf[win] ** 2)))
             plan = int(g["simulation.flight.plan"].iloc[0])
             for f in filters:
                 if f"{f}__err" not in data or data[f"{f}__err"].size == 0:
@@ -306,24 +328,38 @@ def make(exp: str = "e5", quick: bool = False) -> None:
                         style_of(f)["label"],
                         str(int(conv.sum())),
                         fmt(b, 1),
+                        fmt(b_filt, 1),
                         fmt(r, 1),
                         fmt(r / b, 2),
+                        fmt(r / b_filt, 2),
                     ]
                 )
-                pcsv.append([region, plan, f, int(conv.sum()), b, r, r / b])
+                pcsv.append([region, plan, f, int(conv.sum()), b, b_filt, r, r / b, r / b_filt])
         out.table(
             "plans",
-            ["Region", "Plan", "Filter", "Conv.\\ runs", "Bound (m)", "Tracking RMSE (m)", "Ratio"],
+            [
+                "Region",
+                "Plan",
+                "Filter",
+                "Conv.\\ runs",
+                "PCRB (m)",
+                "Tuned KF (m)",
+                "Tracking RMSE (m)",
+                "RMSE/PCRB",
+                "RMSE/tuned KF",
+            ],
             prows,
-            align="lllrrrr",
+            align="lllrrrrrr",
             csv_header=[
                 "region",
                 "plan",
                 "filter",
                 "converged_runs",
                 "pcrb_tracking_m",
+                "tuned_kf_rmse_tracking_m",
                 "tracking_rmse_m",
                 "ratio",
+                "ratio_tuned_kf",
             ],
             csv_rows=pcsv,
         )
@@ -349,6 +385,8 @@ def make(exp: str = "e5", quick: bool = False) -> None:
             ax.set_yscale("log")
             ax.set_xlim(lim)
             ax.set_ylim(lim)
+            plain_log_ticks(ax, "x")
+            plain_log_ticks(ax, "y")
             ax.set_xlabel("Per-flight PCRB, final 100 s (m)")
             ax.set_ylabel("Tracking RMSE, final 100 s (m)")
             ax.legend(fontsize=6.5, loc="upper left")
@@ -357,5 +395,27 @@ def make(exp: str = "e5", quick: bool = False) -> None:
             ratios = [r / b for (b, r, _) in pts[f] if np.isfinite(r)]
             if ratios:
                 macros[macro_name("e5 plan ratio median", f)] = fmt(float(np.median(ratios)), 2)
+        # medians over the five flight plans, per region and filter
+        pc = pd.DataFrame(
+            pcsv,
+            columns=[
+                "region",
+                "plan",
+                "filter",
+                "conv",
+                "pcrb",
+                "tuned",
+                "rmse",
+                "ratio",
+                "ratio_tuned",
+            ],
+        )
+        for (region, f), g in pc.groupby(["region", "filter"]):
+            base = ("e5 plan", REGION_SHORT.get(region, region), f)
+            macros[macro_name(*base, "pcrb")] = fmt(float(g["pcrb"].median()), 1)
+            macros[macro_name(*base, "tuned")] = fmt(float(g["tuned"].median()), 1)
+            macros[macro_name(*base, "rmse")] = fmt(float(g["rmse"].median()), 1)
+            macros[macro_name(*base, "ratio")] = fmt(float(g["ratio"].median()), 2)
+            macros[macro_name(*base, "ratio tuned")] = fmt(float(g["ratio_tuned"].median()), 2)
     out.macros(macros)
     print(f"[{exp}] figures, tables and macros written to {out.root}")
