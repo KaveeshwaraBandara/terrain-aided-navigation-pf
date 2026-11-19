@@ -380,3 +380,113 @@ approximation. With 5\,000 particles about 20\,\% of Monte Carlo error is added
 (\EFivePlanHillPfFiveZeroZeroZeroRatioTuned); the EKF's converged runs are
 \EFivePlanHillEkfRatioTuned{} times the tuned limit, because it linearises at its own estimate
 rather than at the truth.
+
+\subsection{E6 --- Detecting and recovering from false lock}\label{sec:e6}
+\emph{Setup:} the divergence monitor of \cref{sec:monitor} (re-spread fraction $\alpha = 0.5$)
+was tuned on separate development seeds ($M = \ESixDevRuns$ per cell; \cref{tab:e6dev}) with a
+rule fixed in advance: the best convergence at $\sigma_0 = 2$\,km among settings with at most
+5\,\% of runs raising an alarm at $\sigma_0 = 250$\,m. No setting met that constraint (the lowest
+was 8\,\%), so --- decided on the development data before the test runs, and recorded as such ---
+the setting with the fewest false alarms was taken: window $L = \ESixWindow$, $p_{\mathrm{FA}} =
+\ESixPfa$. The test on the main seeds ($M = \ESixTestRuns$) compares, on identical flights, the
+plain PF ($N = 5\,000$), the PF with the monitor, the PF with roughening ($K = 0.05$, the value
+that worked best in E3) and the PF with both. The monitor against the plain PF is the primary
+comparison; the other two were added because E3 had shown roughening to attack the same failure.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e6_test.pdf}
+  \caption{E6: converged (top) and falsely locked (bottom) runs for the four variants at
+    $\sigma_0 = 250$\,m and 2\,km, $M = \ESixTestRuns$ on the main seeds, Wilson 95\,\% intervals.}
+  \label{fig:e6}
+\end{figure}
+
+The monitor does what it was designed for (\cref{fig:e6,tab:e6}). At $\sigma_0 = 2$\,km on the
+hill country it raises convergence from \ESixHillSTwoZeroZeroZeroPfFiveZeroZeroZeroConv\,\% to
+\ESixHillSTwoZeroZeroZeroPfMonitorConv\,\% and cuts false lock from
+\ESixHillSTwoZeroZeroZeroPfFiveZeroZeroZeroFl\,\% to \ESixHillSTwoZeroZeroZeroPfMonitorFl\,\%
+(Kandy: \ESixKandySTwoZeroZeroZeroPfFiveZeroZeroZeroConv\,\% $\to$
+\ESixKandySTwoZeroZeroZeroPfMonitorConv\,\%; McNemar $p < 0.001$ on both regions). At
+$\sigma_0 = 250$\,m, where it should stay silent, \ESixHillSTwoFiveZeroPfMonitorAlarm\,\% of the
+hill-country runs raise an alarm, but convergence is unaffected
+(\ESixHillSTwoFiveZeroPfFiveZeroZeroZeroConv\,\% $\to$ \ESixHillSTwoFiveZeroPfMonitorConv\,\%):
+keeping half of the cloud means a false alarm costs little. On the plains the monitor changes
+nothing (\ESixPlainsSTwoZeroZeroZeroPfFiveZeroZeroZeroConv\,\% vs.\
+\ESixPlainsSTwoZeroZeroZeroPfMonitorConv\,\%), as expected: there the filter does not fail by locking
+falsely, so there is nothing to detect.
+
+Roughening alone is almost as effective on the hills
+(\ESixHillSTwoZeroZeroZeroPfRoughConv\,\%) but leaves more false locks
+(\ESixHillSTwoZeroZeroZeroPfRoughFl\,\%), and it is the only variant that helps on the plains
+(\ESixPlainsSTwoZeroZeroZeroPfRoughConv\,\%). The two mechanisms are complementary: roughening
+prevents locks by keeping hypotheses near the truth alive during acquisition; the monitor recovers
+from those that still happen. Together they reach \ESixHillSTwoZeroZeroZeroPfMonitorRoughConv\,\%
+(hill country) and \ESixKandySTwoZeroZeroZeroPfMonitorRoughConv\,\% (Kandy) at $\sigma_0 = 2$\,km,
+with at most \ESixHillSTwoZeroZeroZeroPfMonitorRoughFl\,\% false locks --- better than the plain
+filter with 20\,000 particles in E1 (\EOneHillSTwoZeroZeroZeroPfTwoZeroZeroZeroZeroConv\,\%), at a
+quarter of the cost. With roughening, the monitor fires in only
+\ESixHillSTwoZeroZeroZeroPfMonitorRoughAlarm\,\% of the hill-country runs instead of
+\ESixHillSTwoZeroZeroZeroPfMonitorAlarm\,\%: there are fewer locks to catch.
+
+\subsection{E7 --- Rao-Blackwellisation}\label{sec:e7}
+\emph{Setup:} plain PF and RBPF with $N \in \{500, 1\,000, 2\,000, 5\,000\}$ on identical flights,
+$\sigma_0 = 1$\,km, $M = \ESevenRuns$ per cell. The two filters cost the same per step at equal
+$N$ (\cref{tab:runtime}), so equal $N$ is also equal runtime (\cref{fig:e7rt}).
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e7_equal_n.pdf}
+  \caption{E7: plain PF vs.\ RBPF at equal particle count: convergence (top), tracking RMSE
+    (middle) and RMS error of the INS-bias estimate in the tracking window (bottom; the prior
+    alone gives 0.42\,m/s). $M = \ESevenRuns$, $\sigma_0 = 1$\,km, 95\,\% intervals.}\label{fig:e7}
+\end{figure}
+
+On the hilly regions the RBPF converges about as often as the plain PF (no significant difference,
+McNemar $p \ge 0.09$; \cref{tab:e7}); on the plains it converges more often at every $N$
+(\ESevenPlainsRbpfNTwoZeroZeroZeroConv\,\% vs.\ \ESevenPlainsPfNTwoZeroZeroZeroConv\,\% at
+$N = 2\,000$, $p = 0.008$). Its clearest advantage is in the quantity it computes exactly
+(\cref{fig:e7}): with $N = 5\,000$ on the hill country its bias estimate has an RMS error of
+\ESevenHillRbpfNFiveZeroZeroZeroBias\,m/s, against \ESevenHillPfNFiveZeroZeroZeroBias\,m/s for the
+plain PF --- whose bias estimate is \emph{no better than the prior} (0.42\,m/s). This is the
+well-known impoverishment of an almost static parameter: the bias changes by only 0.002\,m/s
+per step, so after repeated resampling all particles' bias values descend from a few ancestors,
+and the estimate is roughly one random draw from the prior. The RBPF never samples the bias and
+cannot impoverish it. The better bias carries over to tracking: from $N = 2\,000$ the RBPF's
+tracking RMSE is lower (\ESevenHillRbpfNFiveZeroZeroZeroTrack{} vs.\
+\ESevenHillPfNFiveZeroZeroZeroTrack\,m on the hill country at $N = 5\,000$). With 500 particles
+the advantage disappears: each particle's bias filter is then driven by few, noisy position
+increments.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{e7_equal_runtime.pdf}
+  \caption{E7: convergence against runtime per step (single-core benchmark); $M = \ESevenRuns$.}
+  \label{fig:e7rt}
+\end{figure}
+
+\subsection{Illustration}\label{sec:illustration}
+\Cref{fig:snapshots,fig:trajectory} show one run, chosen by a fixed rule rather than by eye: the
+lowest-index E1 run on the hill country with $\sigma_0 = 2$\,km in which the 20\,000-particle PF
+converged after at least 60\,s and the EKF did not. It was re-simulated from its seeds with the
+particle cloud recorded, reproducing the saved run exactly. Five seconds after take-off the cloud
+has fragmented into clusters along terrain contours --- the multimodal posterior the EKF cannot
+represent. By 20\,s it has collapsed onto one tight cluster some 100--150\,m from the truth, a
+temporarily wrong mode, and between 60 and 150\,s the measurements move it onto the truth, where
+it stays. Meanwhile the EKF confidently follows the wrong slope away from the truth and ends
+further off than dead reckoning. An animation of this run (\texttt{report/figures/visuals\_animation.mp4})
+is in the repository.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{visuals_snapshots.pdf}
+  \caption{Particle cloud (blue, 4\,000 of 20\,000 particles shown) over the hill-country
+    hillshade at six instants of the illustrative run; $+$ truth, $\times$ PF estimate. Note the
+    changing scale bars.}\label{fig:snapshots}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\textwidth]{visuals_trajectory.pdf}
+  \caption{Trajectories of the illustrative run; inset: the lock-on of the particle filter
+    (20\,s before to 20\,s after its convergence time).}\label{fig:trajectory}
+\end{figure}

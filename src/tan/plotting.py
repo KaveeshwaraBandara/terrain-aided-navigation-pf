@@ -39,6 +39,9 @@ COLORS = {
     "pf_sz_x2": _BLUE,
     "pf_sz_x4": _BLUE,
     "pf_hbias": _RED,
+    # E6: roughening is a parameter of the PF (blue); the monitor keeps its colour
+    "pf_rough": _BLUE,
+    "pf_monitor_rough": _YELLOW,
 }
 LINESTYLES = {
     "particle_filter": "-",
@@ -52,6 +55,8 @@ LINESTYLES = {
     "pf_sz_x2": (0, (4, 2)),
     "pf_sz_x4": (0, (1, 1.5)),
     "pf_hbias": "-.",
+    "pf_rough": ":",
+    "pf_monitor_rough": ":",
 }
 LABELS = {
     "particle_filter": "Particle filter",
@@ -65,6 +70,8 @@ LABELS = {
     "pf_sz_x2": r"PF, $\sigma_z \times 2$",
     "pf_sz_x4": r"PF, $\sigma_z \times 4$",
     "pf_hbias": "PF + offset state",
+    "pf_rough": "PF + roughening",
+    "pf_monitor_rough": "PF + monitor + roughening",
 }
 ELEVATION_CMAP = LinearSegmentedColormap.from_list("elev", ["#f6f1e7", "#c9a77c", "#5b3a1e"])
 

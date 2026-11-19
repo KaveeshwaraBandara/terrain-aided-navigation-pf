@@ -18,6 +18,30 @@ per-flight time rises from 0.27 s alone to ~1.05 s when 15 workers share memory 
 
 ---
 
+## 2026-11-19 — E6 test (main seeds, M = 300 per cell): monitor, roughening and both
+
+Settings fixed before this run (dev study + E3): window 20, p_FA = 0.001, α = 0.5; K = 0.05.
+Converged % / false lock % at σ₀ = 2 km (hill / Kandy / plains):
+
+| variant | hill | Kandy | plains |
+|---|---|---|---|
+| PF 5 000 | 40 / 54 | 39 / 58 | 37 / 6 |
+| + monitor (primary) | **84 / 2** | **80 / 4** | 37 / 1 |
+| + roughening | 83 / 16 | 81 / 18 | **60** / 1 |
+| + both | **96 / 1** | **94 / 0** | 58 / 0 |
+
+- Primary comparison (monitor vs PF): McNemar 3 vs 135 (hill), 4 vs 127 (Kandy) discordant runs,
+  p < 0.001; plains 5 vs 6, p = 1.0 (no false locks to detect there).
+- At σ₀ = 250 m the monitor alarms in 7–9 % of runs (≈ the 8 % dev estimate) and convergence is
+  unchanged (98 → 100 %, 99 → 99 %, 62 → 61 %): false alarms are cheap.
+- Roughening and the monitor are complementary: roughening prevents locks (fewer to catch: alarm
+  rate at 2 km drops from 78 % to 22 % on the hill country), the monitor recovers from those that
+  still happen. The combination with 5 000 particles beats PF 20 000 without either (E1, same
+  flights: 70 %).
+- On the plains only roughening helps (37 → 60 %): failures there are imprecision, not lock.
+
+---
+
 ## 2026-11-19 — E7: Rao-Blackwellised PF vs plain PF (σ₀ = 1 km, M = 100 per cell)
 
 Equal N is also equal runtime here (benchmark: RBPF 0.83 ms vs PF 0.83 ms per step at N = 5 000).

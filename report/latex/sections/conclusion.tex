@@ -1,0 +1,32 @@
+\section{Conclusion}\label{sec:conclusion}
+
+A particle filter for terrain-aided navigation was implemented, validated against the exact
+Kalman filter on planar terrain, and evaluated over real terrain of Sri Lanka in seven Monte Carlo
+experiments. The main conclusions are:
+
+\begin{enumerate}
+  \item \textbf{The particle filter is the right tool, and real terrain makes the case more
+        strongly than synthetic terrain.} The EKF's local linearisation breaks down at initial
+        errors of about 100\,m over real hills (\EOneHillSOneZeroZeroEkfConv\,\% convergence) and
+        then performs worse than no terrain aiding, while the particle filter converges reliably up
+        to about 1\,km and tracks at 6--10\,m.
+  \item \textbf{Terrain decides what is possible.} Performance follows the terrain information
+        under the flight, for regions and for individual flights; over flat plains the particle
+        filter stays honestly uncertain instead of locking falsely.
+  \item \textbf{False lock is the failure to design against.} More particles help, but roughening
+        and a divergence monitor that needs no ground truth are cheaper and complementary; together
+        they reach \ESixHillSTwoZeroZeroZeroPfMonitorRoughConv\,\% convergence at 2\,km initial
+        uncertainty with 5\,000 particles. The resampling scheme and the ESS threshold, by
+        contrast, hardly matter.
+  \item \textbf{Robustness and efficiency.} A Student-$t$ likelihood removes the sensitivity to
+        altimeter outliers at no cost; constant map or altimeter offsets above about 10\,m remain
+        the most damaging model error; Rao-Blackwellising the INS bias fixes the plain filter's
+        inability to estimate it at no extra cost.
+  \item \textbf{How far from optimal.} The filters never undercut the posterior Cramér--Rao
+        bound; in the tracking phase they stay about twice above it, almost entirely because of
+        their deliberately inflated process noise --- a trade made for robust acquisition, where
+        the bound, blind to ambiguity, is not informative.
+\end{enumerate}
+
+Every number, table and figure in this report is regenerated from saved results by scripts in the
+repository, and the study regions and analysis rules were fixed before the experiments ran.

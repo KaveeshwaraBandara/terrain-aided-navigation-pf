@@ -38,6 +38,8 @@ SIGMA = "init.position_sigma"
 WIN = "particle_filter.monitor.window"
 PFA = "particle_filter.monitor.false_alarm_prob"
 MAX_FALSE_ALARM = 0.05
+VARIANTS = ["pf_5000", "pf_monitor", "pf_rough", "pf_monitor_rough"]
+MARKERS = {"pf_5000": "o", "pf_monitor": "D", "pf_rough": "s", "pf_monitor_rough": "^"}
 
 
 def choose(dev) -> tuple[dict, list]:
@@ -128,24 +130,25 @@ def make(exp: str = "e6", quick: bool = False) -> None:
     if not test.empty:
         regions = regions_in(test)
         sigmas = sorted(test[SIGMA].unique())
-        filters = ["pf_5000", "pf_monitor"]
-        stats, rows, csv_rows = {}, [], []
-        for (region, s, f), g in test.groupby(["region", SIGMA, "filter"]):
-            stats[(region, s, f)] = {
+        variants = [v for v in VARIANTS if v in set(test["filter"])]
+        stats = {}
+        for (region, s0, f), g in test.groupby(["region", SIGMA, "filter"]):
+            stats[(region, s0, f)] = {
                 "conv": rate(g, "converged"),
                 "fl": rate(g, "false_lock"),
                 "alarm": rate(g.assign(a=g["n_alarms"] > 0), "a"),
             }
         with report_style():
-            fig = Figure(figsize=(TEXT_WIDTH_IN, 2.7), layout="constrained")
-            axes = fig.subplots(1, len(sigmas), sharey=True, squeeze=False)[0]
-            for ax, s in zip(axes, sigmas, strict=True):
-                axes_style(ax)
-                for k, f in enumerate(filters):
-                    st = style_of(f)
-                    x = np.arange(len(regions)) + (k - 0.5) * 0.22
-                    for key, mk, fill in (("conv", "o", True), ("fl", "x", False)):
-                        v = [stats[(r, s, f)][key] for r in regions]
+            fig = Figure(figsize=(TEXT_WIDTH_IN, 4.4), layout="constrained")
+            axes = fig.subplots(2, len(sigmas), sharex=True, sharey=True, squeeze=False)
+            for j, s0 in enumerate(sigmas):
+                for i, key in enumerate(("conv", "fl")):
+                    ax = axes[i, j]
+                    axes_style(ax)
+                    for k, f in enumerate(variants):
+                        st = style_of(f)
+                        x = np.arange(len(regions)) + (k - (len(variants) - 1) / 2) * 0.17
+                        v = [stats[(r, s0, f)][key] for r in regions]
                         y = 100 * np.array([a["rate"] for a in v])
                         lo = 100 * np.array([a["lo"] for a in v])
                         hi = 100 * np.array([a["hi"] for a in v])
@@ -153,92 +156,94 @@ def make(exp: str = "e6", quick: bool = False) -> None:
                             x,
                             y,
                             yerr=yerr(y, lo, hi),
-                            fmt=mk,
+                            fmt=MARKERS[f],
                             ms=4,
                             capsize=2,
                             color=st["color"],
-                            mfc=st["color"] if fill else "none",
-                            label=f"{st['label']}: "
-                            + ("converged" if key == "conv" else "false lock"),
+                            label=st["label"],
                         )
-                ax.set_xticks(range(len(regions)))
-                ax.set_xticklabels([REGION_LABELS.get(r, r) for r in regions])
-                ax.set_title(f"σ₀ = {s:g} m")
-                ax.set_ylim(-3, 103)
-            axes[0].set_ylabel("Runs (%)")
-            handles, labels = axes[0].get_legend_handles_labels()
-            fig.legend(handles, labels, loc="outside lower center", ncol=2)
+                    ax.set_xticks(range(len(regions)))
+                    ax.set_xticklabels([REGION_LABELS.get(r, r) for r in regions])
+                    ax.set_ylim(-3, 103)
+                    if i == 0:
+                        ax.set_title(f"σ₀ = {s0:g} m")
+                axes[0, 0].set_ylabel("Converged runs (%)")
+                axes[1, 0].set_ylabel("False-lock runs (%)")
+            handles, labels = axes[0, 0].get_legend_handles_labels()
+            fig.legend(handles, labels, loc="outside lower center", ncol=len(labels))
             save_report(fig, out.figure("test"))
+
+        rows, csv_rows, trows, tcsv = [], [], [], []
         for region in regions:
-            for s in sigmas:
-                g = test[(test["region"] == region) & (test[SIGMA] == s)]
+            for s0 in sigmas:
+                g = test[(test["region"] == region) & (test[SIGMA] == s0)]
                 piv = g.pivot(index="run", columns="filter", values="converged")
-                t = mcnemar(piv["pf_5000"].to_numpy(), piv["pf_monitor"].to_numpy())
-                a, b = stats[(region, s, "pf_5000")], stats[(region, s, "pf_monitor")]
-                rows.append(
-                    [
-                        REGION_LABELS.get(region, region),
-                        f"{s:g}",
-                        ci(a["conv"]),
-                        ci(b["conv"]),
-                        pct(a["fl"]["rate"]),
-                        pct(b["fl"]["rate"]),
-                        pct(b["alarm"]["rate"]),
-                        f"{t['a_only']}/{t['b_only']}",
-                        "$<$0.001" if t["p_value"] < 1e-3 else fmt(t["p_value"], 3),
-                    ]
-                )
-                csv_rows.append(
-                    [
-                        region,
-                        s,
-                        a["conv"]["rate"],
-                        b["conv"]["rate"],
-                        a["fl"]["rate"],
-                        b["fl"]["rate"],
-                        b["alarm"]["rate"],
-                        t["a_only"],
-                        t["b_only"],
-                        t["p_value"],
-                    ]
-                )
-                base = ("e6", REGION_SHORT.get(region, region), f"s{s:g}")
-                macros[macro_name(*base, "conv base")] = pct(a["conv"]["rate"])
-                macros[macro_name(*base, "conv mon")] = pct(b["conv"]["rate"])
-                macros[macro_name(*base, "fl base")] = pct(a["fl"]["rate"])
-                macros[macro_name(*base, "fl mon")] = pct(b["fl"]["rate"])
-                macros[macro_name(*base, "alarm")] = pct(b["alarm"]["rate"])
-                macros[macro_name(*base, "p")] = (
-                    "<0.001" if t["p_value"] < 1e-3 else fmt(t["p_value"], 3)
-                )
+                row = [REGION_LABELS.get(region, region), f"{s0:g}"]
+                for f in variants:
+                    a = stats[(region, s0, f)]
+                    row.append(f"{ci(a['conv'])} / {pct(a['fl']['rate'])}")
+                    base = ("e6", REGION_SHORT.get(region, region), f"s{s0:g}", f)
+                    macros[macro_name(*base, "conv")] = pct(a["conv"]["rate"])
+                    macros[macro_name(*base, "fl")] = pct(a["fl"]["rate"])
+                    if f in ("pf_monitor", "pf_monitor_rough"):
+                        macros[macro_name(*base, "alarm")] = pct(a["alarm"]["rate"])
+                    csv_rows.append(
+                        [
+                            region,
+                            s0,
+                            f,
+                            a["conv"]["rate"],
+                            a["conv"]["lo"],
+                            a["conv"]["hi"],
+                            a["fl"]["rate"],
+                            a["alarm"]["rate"],
+                        ]
+                    )
+                row.append(pct(stats[(region, s0, "pf_monitor")]["alarm"]["rate"]))
+                rows.append(row)
+                for f in [v for v in variants if v != "pf_5000"]:
+                    t = mcnemar(piv["pf_5000"].to_numpy(), piv[f].to_numpy())
+                    p = "$<$0.001" if t["p_value"] < 1e-3 else fmt(t["p_value"], 3)
+                    trows.append(
+                        [
+                            REGION_LABELS.get(region, region),
+                            f"{s0:g}",
+                            f"PF vs {style_of(f)['label']}",
+                            str(t["a_only"]),
+                            str(t["b_only"]),
+                            p,
+                        ]
+                    )
+                    tcsv.append([region, s0, f, t["a_only"], t["b_only"], t["p_value"]])
+                    macros[
+                        macro_name("e6", REGION_SHORT.get(region, region), f"s{s0:g}", f, "p")
+                    ] = "<0.001" if t["p_value"] < 1e-3 else fmt(t["p_value"], 3)
         out.table(
             "test",
-            [
-                "Region",
-                "$\\sigma_0$ (m)",
-                "Conv.\\ PF (\\%)",
-                "Conv.\\ PF+mon.\\ (\\%)",
-                "FL PF",
-                "FL PF+mon.",
-                "Runs with alarm (\\%)",
-                "Discordant",
-                "$p$",
-            ],
+            ["Region", "$\\sigma_0$ (m)"]
+            + [f"{style_of(f)['label']}" for f in variants]
+            + ["Alarm (\\%)"],
             rows,
-            align="llrrrrrrr",
+            align="ll" + "r" * (len(variants) + 1),
             csv_header=[
                 "region",
                 "sigma0_m",
-                "conv_pf",
-                "conv_monitor",
-                "fl_pf",
-                "fl_monitor",
-                "alarm_rate_monitor",
-                "pf_only",
-                "monitor_only",
-                "p_value",
+                "filter",
+                "conv_rate",
+                "conv_lo",
+                "conv_hi",
+                "false_lock_rate",
+                "alarm_rate",
             ],
             csv_rows=csv_rows,
+        )
+        out.table(
+            "test_mcnemar",
+            ["Region", "$\\sigma_0$ (m)", "Comparison", "Only PF", "Only variant", "$p$"],
+            trows,
+            align="lllrrr",
+            csv_header=["region", "sigma0_m", "variant", "pf_only", "variant_only", "p_value"],
+            csv_rows=tcsv,
         )
         macros["ESixTestRuns"] = str(int(test["run"].nunique()))
     out.macros(macros)

@@ -1,0 +1,8 @@
+{
+  "region": "hill_country",
+  "sigma0": 2000.0,
+  "run": 40,
+  "rule": "primary",
+  "reproduced": true,
+  "convergence_time_s": 72.0
+}

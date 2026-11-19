@@ -52,11 +52,32 @@ parameter table), `benchmark.py` (runtimes).
 To try anything without real terrain: append `@synth` to an experiment name
 (`--experiment e1@synth`) to run it on the synthetic map; such results never touch `report/`.
 
-## 3. What each figure shows
+## 3. What each figure shows (and what to look at)
 
-*(Filled in once the full experiments have run — see below.)*
+All figures are in `report/figures/` (PDF for LaTeX, PNG preview); numbers in
+`report/tables/*.csv`. Colours are fixed per estimator: PF blue, EKF orange, dead reckoning green,
+PF 20 000 violet, RBPF pink, monitor yellow.
 
-## 4. Known limitations
+| Figure | What it shows | What to look at |
+|---|---|---|
+| `region_map`, `terrain_overview` | the three boxes on the island; elevation + hillshade of each | elevation scales differ: the plains span only 127 m |
+| `e1_rates` | % converged (top) and % false lock (bottom) vs σ₀, per region | EKF fails already at σ₀ = 100 m on real hills; PF degrades gracefully; on the plains the PF almost never false-locks |
+| `e1_error_vs_time` | median error over time (σ₀ = 500 / 2000 m) | EKF error *grows* past dead reckoning on the hills; PF drops to metres in 10–20 s |
+| `e2_scatter` | per-flight error vs roughness under the flight | opposite slopes: PF ρ ≈ −0.63, EKF ρ ≈ +0.29 |
+| `e2_binned` | convergence vs terrain information along the flight | more information → more convergence, for both filters |
+| `e3_particles` | convergence vs N; tracking RMSE vs runtime | particles buy acquisition robustness, not tracking accuracy |
+| `e3_design` | resampling scheme / ESS threshold / roughening | only roughening matters (K = 0.05: 71 → 94 %) |
+| `e4_outliers` | Gaussian vs Student-t likelihood under radar outliers | Student-t stays at ≈ 95 % where Gaussian drops to ≈ 40 % |
+| `e4_map_error` | constant offset + map-error field; σ_z inflation; offset state | offsets ≥ 10 m defeat the nominal PF; offset state is the only fix at 20 m but costs acquisition |
+| `e4_ins_grade` | INS bias 0.1 / 0.3 / 1.0 m/s | worse INS → worse tracking; PF still converges |
+| `e5_bound` | RMSE (all runs thick, converged thin) vs PCRB | the bound is never crossed; the gap between thick and thin is ambiguity |
+| `e5_anees` | ANEES vs time (all / converged runs) | meaningless over all runs (false locks); consistent-to-conservative in tracking |
+| `e5_plans` | per-flight tracking RMSE vs per-flight bound | ≈ 2× on the hills = the tuning (mismatched-gain analysis); plains points below the line are a selection effect |
+| `e6_test` | convergence / false lock with monitor, roughening, both | see §4.7 of the report |
+| `e7_equal_n`, `e7_equal_runtime` | RBPF vs PF | RBPF bias error far lower; the PF's bias estimate is no better than the prior |
+| `visuals_snapshots`, `visuals_trajectory`, `visuals_animation.mp4/.gif` | one run chosen by a fixed rule | multimodal cloud at 5 s, temporary wrong mode at 20–60 s, lock-on by 150 s; EKF wanders off |
+
+## 4. Known limitations (see also report §5.5)
 
 - **Simulated sensors and flights.** No real flight data; the altimeter noise (2 m baro, 3 m radar,
   white, range-independent) is an assumption, not a datasheet value.
@@ -68,6 +89,13 @@ To try anything without real terrain: append `@synth` to an experiment name
 - **Filter process noise is a tuning choice** (σ_p = 2 m/step vs ≈ 0.05 m/step true), which makes
   the filters conservative and keeps them above the PCRB.
 - **One INS model** (velocity bias random walk + white noise); no attitude-coupled errors.
+- **Radar range up to ≈ 1.7 km** over the hills (corridor altitude) with a range-independent
+  3 m noise — optimistic.
+- **Kandy is not "moderate"**: the pre-registered rule picked the least rough Kandy box, which is
+  still closer to the rugged end.
+- **E6 rule extension**: no monitor setting met the pre-registered 5 % false-alarm constraint; the
+  fallback (lowest false-alarm rate) was decided on dev data before the test run and is reported
+  as such.
 
 ## 5. Likely viva questions
 
@@ -102,4 +130,31 @@ To try anything without real terrain: append `@synth` to an experiment name
 12. **What is the Copernicus DEM's accuracy and why does DSM matter?** < 4 m absolute, < 2–4 m
     relative (LE90); it includes vegetation and buildings, which the radar may not see.
 
-*(More questions on the experimental results are added with the results.)*
+13. **What was the most surprising result?** How early the EKF fails on real terrain
+    (σ₀ = 100 m) compared with the smooth synthetic map (held up to 1 km) — the real DEM's slope
+    changes within a few cells.
+14. **Why is the EKF worse than dead reckoning?** Wrong-slope corrections also corrupt its bias
+    estimate, so it drifts faster than the uncorrected INS.
+15. **Why do more particles help acquisition but hardly tracking?** Acquisition needs particles
+    near the truth among kilometres of prior; tracking needs only a few hundred around one mode.
+16. **Why does roughening help so much?** The jitter scales with the cloud spread, so it is an
+    adaptive process-noise inflation: large while the cloud is wide (keeps hypotheses near the
+    truth alive), negligible once collapsed; too much (K = 0.2) blurs the information.
+17. **Did the resampling scheme matter?** Not for convergence or RMSE (as Hol et al. found), even
+    though the measured offspring variance ranks multinomial > residual > stratified > systematic.
+18. **Why are the filters ≈ 2× above the PCRB?** Their process noise is inflated (2 m/step vs
+    0.05 m); a Kalman filter with the true slopes but the same tuning is only ≈ 5 % better than
+    PF 20 000.
+19. **Can the RMSE be below the PCRB?** Not unconditionally (checked: never). The converged-only
+    RMSE on the plains is below it because selecting runs with error < 50 m truncates the errors
+    where the bound itself is ≈ 25–36 m.
+20. **Why is the NEES so large during acquisition?** The weighted covariance of a cloud dominated
+    by a wrong mode understates the error; NEES assumes a Gaussian posterior.
+21. **How was the monitor tuned without cheating?** On separate development seeds with a rule fixed
+    in advance; when no setting met the false-alarm constraint, the recorded extension (lowest
+    false-alarm rate) was applied before the test seeds were run.
+22. **Why the RBPF?** The bias is static-ish and linear-Gaussian given the path; the plain PF
+    impoverishes it (estimate no better than the prior), the RBPF computes it exactly at the same
+    cost.
+23. **What would you do next?** Rao-Blackwellise the offset state, a likelihood-informed proposal
+    against false lock, and real flight data.

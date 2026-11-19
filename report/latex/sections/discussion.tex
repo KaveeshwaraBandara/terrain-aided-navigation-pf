@@ -1,0 +1,115 @@
+\section{Discussion}\label{sec:discussion}
+
+\subsection{Why the particle filter wins, and where the EKF breaks}
+The decisive quantity is the ratio between the position uncertainty and the distance over which
+the terrain slope stays roughly constant. The EKF replaces the terrain by its tangent plane at the
+current estimate; that is adequate only when the error is small compared with the terrain's
+correlation length. The smooth synthetic hills used during development have correlation lengths of
+hundreds of metres to kilometres, and there the EKF held up to $\sigma_0 = 1$\,km. The real 30\,m
+DEM of the hill country changes slope within a few cells, so the EKF already fails in
+\EOneHillSOneZeroZeroEkfFl\,\% of the runs at $\sigma_0 = 100$\,m (E1). E2 shows the same effect
+from the other side: the rougher the terrain under a flight, the \emph{larger} the EKF's error
+($\rho = +\ETwoRhoEkf$) and the smaller the particle filter's ($\rho = \ETwoRhoPfFiveZeroZeroZero$).
+Terrain texture is information for an estimator that evaluates the likelihood globally and noise
+for one that linearises it locally.
+
+Two consequences are worth stressing. First, a failed EKF is not merely inaccurate: its error
+grows faster than that of the uncorrected INS, because corrections computed from the wrong slope
+also corrupt its bias estimate (\cref{fig:e1time}). A linearised TAN filter whose linearisation is
+invalid is worse than no terrain aiding. Second, its failures are confident: the EKF's dominant
+failure mode is false lock (\cref{fig:e1rates}), so its own covariance gives no warning.
+
+The particle filter pays for its robustness in computation, but on this problem the cost is
+irrelevant: \RtPfFiveZeroZeroZero\,ms per step for 5\,000 particles on one laptop core, three
+orders of magnitude inside the 1\,Hz measurement interval (E3).
+
+\subsection{Terrain decides}
+The three regions differ by two orders of magnitude in the information one altimeter sample
+carries (\cref{tab:terrain}), and that ordering carries through every experiment. Over the hills
+the particle filter tracks at 6--10\,m; over the plains at about 20--25\,m, close to the posterior
+bound there (E5). The plains also show the most desirable property of a Bayesian filter: when the
+terrain says little, the particle filter's covariance stays wide and it almost never locks
+falsely (E1), so a navigation system could trust its own uncertainty and fall back on other
+sources. The EKF has no such honesty --- it false-locks most often precisely where the terrain is
+least informative relative to its linearisation errors.
+
+The along-/cross-track decomposition (E2) did not show the elongated error along ridges and valleys
+one might expect: averaged over flights with a 25$^\circ$ heading weave over 40\,km of varied
+terrain, both directions are about equally constrained. The effect may exist on individual straight
+flights along a valley, which this design does not isolate.
+
+\subsection{Failure modes and their remedies}
+\paragraph{False lock.} With a wide prior the particle filter's dominant failure is to collapse onto
+the wrong patch of terrain (E1, E3). Three remedies were tested on identical flights: more particles
+(E3: \EThreeNFiveKConv\,\% $\to$ \EThreeNTwentyKConv\,\% convergence from 5\,000 to 20\,000 at
+$\sigma_0 = 1$\,km), roughening (E3: \EThreeRoughZeroPointZeroFiveConv\,\% with $K = 0.05$ at the
+cost of 5\,000 particles) and the divergence monitor (E6). Roughening acts early, by keeping
+hypotheses near the truth alive while the cloud is wide; the monitor acts late, by detecting a lock
+that has already happened and re-opening the search.
+On the main seeds (E6) the monitor alone lifts convergence at $\sigma_0 = 2$\,km on the hill
+country from \ESixHillSTwoZeroZeroZeroPfFiveZeroZeroZeroConv\,\% to
+\ESixHillSTwoZeroZeroZeroPfMonitorConv\,\%, roughening alone to
+\ESixHillSTwoZeroZeroZeroPfRoughConv\,\%, and the two together to
+\ESixHillSTwoZeroZeroZeroPfMonitorRoughConv\,\% with almost no false locks --- more than four
+times as many particles achieve without them. The monitor's value lies in a property no amount of
+particles provides: it turns a silent failure into a detected one, from information available on
+board (the predicted innovation), without ground truth. Its false alarms are cheap because the
+re-spread keeps half of the current cloud. Where the filter fails by imprecision rather than by
+locking (the plains), there is nothing for the monitor to detect, and only roughening helps.
+
+\paragraph{Altimeter outliers.} A Gaussian likelihood lets a single gross radar error destroy the
+particles at the truth. The Student-$t$ likelihood keeps convergence at
+\EFourOutliersHillOneZeroPfStudentTConv\,\% with 10\,\% outliers (Gaussian:
+\EFourOutliersHillOneZeroPfFiveZeroZeroZeroConv\,\%) and costs nothing without them (E4). There is
+no reason not to use it.
+
+\paragraph{Map and altimeter offsets.} A random map error of the size the Copernicus handbook
+implies is harmless, but a constant offset between measured and mapped height --- a barometric
+bias, or a radar seeing through a canopy the surface model includes --- defeats the filter beyond
+about 5\,m (E4). Inflating $\sigma_z$ buys tolerance up to about 10\,m; estimating the offset as a
+state is the only remedy at 20\,m but costs acquisition when there is no offset. The obvious next
+step is to treat the offset like the bias in the RBPF: it enters the measurement linearly, so it
+could be marginalised analytically instead of sampled.
+
+\paragraph{Static-parameter impoverishment.} The plain particle filter cannot estimate the INS bias
+(E7): with a nearly static bias, resampling leaves bias values from a few ancestors, and the
+estimate is no better than the prior. Rao-Blackwellisation removes the problem at no extra cost and
+improves tracking from 2\,000 particles. It is the better filter for this model.
+
+\subsection{How close to optimal?}
+The posterior Cramér--Rao bound is never violated, which checks the whole chain of simulation,
+filters and bound. In the tracking phase the filters are about twice the per-flight bound on the
+hills, and the mismatched-gain analysis shows why: the deliberately inflated process noise
+($\sigma_p = 2$\,m per step vs.\ a true $\approx0.05$\,m) alone allows only
+\EFivePlanHillPfTwoZeroZeroZeroZeroTuned\,m, and the 20\,000-particle PF reaches
+\EFivePlanHillPfTwoZeroZeroZeroZeroRmse\,m (E5). The inflation is a deliberate trade:
+smaller process noise would track closer to the bound but would make the cloud less diverse during
+acquisition, where E3 shows diversity (roughening) to be what matters. During acquisition the
+bound is not a useful benchmark, because it ignores ambiguity --- which is precisely what makes TAN
+hard; a bound that accounts for ambiguity would be needed there. The NEES behaves accordingly: consistent to conservative in the tracking phase,
+uninformative while the posterior is multimodal.
+
+\subsection{Limitations}\label{sec:limitations}
+\begin{itemize}
+  \item \textbf{Simulated sensors and flights.} No real flight data were used. The altimeter noise
+        (2\,m barometric, 3\,m radar, white and range-independent) is an assumption, and an
+        optimistic one at the 1--1.7\,km radar ranges the corridor altitude produces over the
+        hills (E1).
+  \item \textbf{Simplified flight.} Constant altitude and a horizontal 2-D state; attitude, height
+        and their errors are not estimated, and the INS model is a velocity bias plus white noise.
+  \item \textbf{The world uses the same map.} The simulated radar sees the DEM itself unless E4
+        adds a map error; real canopy and DSM effects are spatially structured and only
+        approximated by a smooth random field and a constant offset.
+  \item \textbf{One tuning.} Process and measurement noise were fixed, not optimised per filter;
+        the EKF in particular might do somewhat better with different tuning, although its failures
+        are structural (linearisation), not a matter of noise levels.
+  \item \textbf{Three regions of one country.} The conclusions about terrain dependence rest on
+        three 40\,km boxes; they are consistent with the per-flight analysis of E2, but other
+        landscapes (urban, forest, desert dunes) were not tested.
+\end{itemize}
+
+\subsection{Future work}
+Natural extensions are a Rao-Blackwellised offset state, an adaptive proposal that uses the
+current measurement (auxiliary or likelihood-based proposals) to fight false lock at its source,
+a point-mass filter as a deterministic reference, real flight data with a recorded radar
+altimeter, and an ambiguity-aware performance bound for the acquisition phase.
